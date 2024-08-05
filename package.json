@@ -1,0 +1,10 @@
+{
+  "name": "@alpanagi/engine",
+  "version": "1.0.0",
+  "main": "src/index.ts",
+  "scripts": {},
+  "keywords": ["3d", "2d", "webgpu", "game"],
+  "author": "Alexandros Panagiotakis <dev@alpanagi.com>",
+  "license": "Apache-2.0",
+  "description": "A Bevy inspired Javascript game engine"
+}
