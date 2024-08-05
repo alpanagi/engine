@@ -1,10 +1,23 @@
 {
   "name": "@alpanagi/engine",
-  "version": "1.0.0",
-  "main": "src/index.ts",
-  "scripts": {},
-  "keywords": ["3d", "2d", "webgpu", "game"],
+  "version": "0.0.1",
+  "main": "./dist/code/index.js",
+  "types": "./dist/types/index.d.js",
+  "scripts": {
+    "build": "tsc"
+  },
+  "keywords": [
+    "3d",
+    "2d",
+    "webgpu",
+    "game"
+  ],
   "author": "Alexandros Panagiotakis <dev@alpanagi.com>",
   "license": "Apache-2.0",
-  "description": "A Bevy inspired Javascript game engine"
+  "description": "A Bevy inspired Javascript game engine",
+  "devDependencies": {
+    "@tsconfig/strictest": "^2.0.5",
+    "typescript": "^5.5.4"
+  },
+  "type": "module"
 }
