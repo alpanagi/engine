@@ -1,4 +1,6 @@
 #include "object.h"
 
-Object::Object(const std::string name, const Mesh &mesh)
+#include <memory>
+
+Object::Object(const std::string name, std::shared_ptr<const Mesh> mesh)
     : mesh(mesh), name(name) {}

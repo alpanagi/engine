@@ -2,8 +2,8 @@
 #include "error.h"
 #include <toml++/toml.h>
 
-std::vector<Mesh> load::meshes() {
-  std::vector<Mesh> meshes;
+std::vector<std::shared_ptr<const Mesh>> load::meshes() {
+  std::vector<std::shared_ptr<const Mesh>> meshes;
 
   toml::table toml = toml::parse_file("../game/meshes.toml");
   toml::node_view meshes_toml = toml["meshes"];
@@ -21,14 +21,14 @@ std::vector<Mesh> load::meshes() {
     toml::table &mesh_toml = *mesh_node.as_table();
     std::string name = mesh_toml["name"].value_or("");
 
-    Mesh mesh(name);
-    meshes.push_back(mesh);
+    meshes.push_back(std::make_shared<const Mesh>(name));
   }
 
   return meshes;
 }
 
-std::vector<Object> load::objects(const std::vector<Mesh> &meshes) {
+std::vector<Object>
+load::objects(const std::vector<std::shared_ptr<const Mesh>> &meshes) {
   std::vector<Object> objects;
 
   toml::table toml = toml::parse_file("../game/objects.toml");
@@ -48,8 +48,8 @@ std::vector<Object> load::objects(const std::vector<Mesh> &meshes) {
     std::string name = object_toml["name"].value_or("");
     std::string mesh_name = object_toml["mesh"].value_or("");
 
-    for (const Mesh &mesh : meshes) {
-      if (mesh.name == mesh_name) {
+    for (std::shared_ptr<const Mesh> mesh : meshes) {
+      if (mesh->name == mesh_name) {
         Object obj = Object(name, mesh);
         objects.push_back(obj);
         break;

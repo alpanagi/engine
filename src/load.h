@@ -3,11 +3,13 @@
 
 #include "mesh.h"
 #include "object.h"
+#include <memory>
 #include <vector>
 
 namespace load {
-std::vector<Mesh> meshes();
-std::vector<Object> objects(const std::vector<Mesh> &meshes);
+std::vector<std::shared_ptr<const Mesh>> meshes();
+std::vector<Object>
+objects(const std::vector<std::shared_ptr<const Mesh>> &meshes);
 } // namespace load
 
 #endif

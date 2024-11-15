@@ -7,6 +7,6 @@ int main() {
 
   for (auto object : objects) {
     std::cout << "name: " << object.name << std::endl;
-    std::cout << "mesh: " << object.mesh.name << std::endl;
+    std::cout << "mesh: " << object.mesh->name << std::endl;
   }
 }
