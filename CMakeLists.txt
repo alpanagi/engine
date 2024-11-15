@@ -4,11 +4,17 @@ project(engine)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+find_package(Vulkan REQUIRED)
+
 add_executable(engine)
+target_link_libraries(engine
+  ${Vulkan_LIBRARIES}
+)
 target_sources(engine PRIVATE
   src/main.cpp
   src/load.cpp
   src/error.cpp
   src/object.cpp
   src/mesh.cpp
+  src/vlk.cpp
 )
