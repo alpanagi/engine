@@ -19,8 +19,9 @@ std::vector<Mesh> load::meshes() {
     }
 
     toml::table &mesh_toml = *mesh_node.as_table();
+    std::string name = mesh_toml["name"].value_or("");
 
-    Mesh mesh(mesh_toml["name"].value_or(""));
+    Mesh mesh(name);
     meshes.push_back(mesh);
   }
 
@@ -44,8 +45,16 @@ std::vector<Object> load::objects(const std::vector<Mesh> &meshes) {
     }
 
     toml::table &object_toml = *object_node.as_table();
-    Object obj(object_toml["name"].value_or(""), meshes[0]);
-    objects.push_back(obj);
+    std::string name = object_toml["name"].value_or("");
+    std::string mesh_name = object_toml["mesh"].value_or("");
+
+    for (const Mesh &mesh : meshes) {
+      if (mesh.name == mesh_name) {
+        Object obj = Object(name, mesh);
+        objects.push_back(obj);
+        break;
+      }
+    }
   }
 
   return objects;
