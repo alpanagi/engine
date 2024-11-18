@@ -1,17 +1,16 @@
-#include "load.h"
-#include "vlk.h"
-#include <iostream>
+#include "graphics/graphics.h"
+#include "graphics/window.h"
 
-int main() {
-  auto meshes = load::meshes();
-  auto objects = load::objects(meshes);
-
-  for (auto object : objects) {
-    std::cout << "name: " << object.name << std::endl;
-    std::cout << "mesh: " << object.mesh->name << std::endl;
-  }
-
-  auto instance = vlk::create_instance();
-  auto physical_device = vlk::get_physical_device(instance);
-  auto device = vlk::create_device(physical_device);
+int main(int argc, char *argv[]) {
+  Window window("Engine");
+  Graphics graphics(window);
+  // window.start_event_loop();
 }
+
+// auto meshes = load::meshes();
+// auto objects = load::objects(meshes);
+
+// for (auto object : objects) {
+//   std::cout << "name: " << object.name << std::endl;
+//   std::cout << "mesh: " << object.mesh->name << std::endl;
+// }
