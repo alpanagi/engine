@@ -26,7 +26,9 @@ Graphics::~Graphics() {
 void Graphics::render() const {
   VkCommandBuffer command_buffer =
       vlk::get_command_buffer(device, command_pool);
+  VkSurfaceCapabilitiesKHR surface_capabilities =
+      vlk::get_surface_capabilities(physical_device, surface);
 
-  vlk::begin_drawing(command_buffer);
+  vlk::begin_drawing(device, command_buffer, surface, surface_capabilities);
   vlk::end_drawing(queue, command_buffer);
 }

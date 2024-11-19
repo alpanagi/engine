@@ -7,13 +7,16 @@
 namespace vlk {
 VkInstance create_instance(std::vector<const char *> extensions);
 VkPhysicalDevice get_physical_device(const VkInstance);
+VkSurfaceCapabilitiesKHR get_surface_capabilities(const VkPhysicalDevice,
+                                                  const VkSurfaceKHR);
 std::pair<VkDevice, VkQueue>
 create_device_and_queue(const VkPhysicalDevice,
                         const uint32_t queue_family_index);
 VkCommandPool create_command_pool(const VkDevice device,
                                   const uint32_t queue_family_index);
 VkCommandBuffer get_command_buffer(const VkDevice, const VkCommandPool);
-void begin_drawing(const VkCommandBuffer);
+void begin_drawing(const VkDevice device, const VkCommandBuffer,
+                   const VkSurfaceKHR, const VkSurfaceCapabilitiesKHR);
 void end_drawing(const VkQueue queue, const VkCommandBuffer command_buffer);
 } // namespace vlk
 
