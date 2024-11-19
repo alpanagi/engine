@@ -98,3 +98,51 @@ VkCommandPool vlk::create_command_pool(const VkDevice device,
 
   return command_pool;
 }
+
+VkCommandBuffer vlk::get_command_buffer(const VkDevice device,
+                                        const VkCommandPool command_pool) {
+  VkCommandBuffer command_buffer;
+
+  VkCommandBufferAllocateInfo command_buffer_allocate_info{
+      .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
+      .commandPool = command_pool,
+      .level = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
+      .commandBufferCount = 1,
+  };
+  if (auto error = vkAllocateCommandBuffers(
+          device, &command_buffer_allocate_info, &command_buffer);
+      error != VK_SUCCESS) {
+    vlk_panic(error);
+  }
+
+  return command_buffer;
+}
+
+void vlk::begin_drawing(const VkCommandBuffer command_buffer) {
+  VkCommandBufferBeginInfo command_buffer_begin_info{
+      .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
+      .flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT,
+  };
+  if (auto error =
+          vkBeginCommandBuffer(command_buffer, &command_buffer_begin_info);
+      error != VK_SUCCESS) {
+    vlk_panic(error);
+  }
+}
+
+void vlk::end_drawing(const VkQueue queue,
+                      const VkCommandBuffer command_buffer) {
+  if (auto error = vkEndCommandBuffer(command_buffer); error != VK_SUCCESS) {
+    vlk_panic(error);
+  }
+
+  VkSubmitInfo submit_info{
+      .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
+      .commandBufferCount = 1,
+      .pCommandBuffers = &command_buffer,
+  };
+  if (auto error = vkQueueSubmit(queue, 1, &submit_info, VK_NULL_HANDLE);
+      error != VK_SUCCESS) {
+    vlk_panic(error);
+  }
+}

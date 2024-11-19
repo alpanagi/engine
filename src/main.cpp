@@ -4,7 +4,7 @@
 int main(int argc, char *argv[]) {
   Window window("Engine");
   Graphics graphics(window);
-  // window.start_event_loop();
+  window.start_event_loop();
 }
 
 // auto meshes = load::meshes();

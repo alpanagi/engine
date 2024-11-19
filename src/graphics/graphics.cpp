@@ -24,40 +24,9 @@ Graphics::~Graphics() {
 }
 
 void Graphics::render() const {
-  VkCommandBuffer command_buffer;
+  VkCommandBuffer command_buffer =
+      vlk::get_command_buffer(device, command_pool);
 
-  VkCommandBufferAllocateInfo command_buffer_allocate_info{
-      .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
-      .commandPool = command_pool,
-      .level = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
-      .commandBufferCount = 1,
-  };
-  if (auto error = vkAllocateCommandBuffers(
-          device, &command_buffer_allocate_info, &command_buffer);
-      error != VK_SUCCESS) {
-    std::cout << "UPDATE LOG CODE: " << error << std::endl;
-  }
-
-  VkCommandBufferBeginInfo command_buffer_begin_info{
-      .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
-      .flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT,
-  };
-  if (auto error =
-          vkBeginCommandBuffer(command_buffer, &command_buffer_begin_info);
-      error != VK_SUCCESS) {
-    std::cout << "UPDATE LOG CODE: " << error << std::endl;
-  }
-  if (auto error = vkEndCommandBuffer(command_buffer); error != VK_SUCCESS) {
-    std::cout << "UPDATE LOG CODE: " << error << std::endl;
-  }
-
-  VkSubmitInfo submit_info{
-      .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
-      .commandBufferCount = 1,
-      .pCommandBuffers = &command_buffer,
-  };
-  if (auto error = vkQueueSubmit(queue, 1, &submit_info, VK_NULL_HANDLE);
-      error != VK_SUCCESS) {
-    std::cout << "UPDATE LOG CODE: " << error << std::endl;
-  }
+  vlk::begin_drawing(command_buffer);
+  vlk::end_drawing(queue, command_buffer);
 }

@@ -12,6 +12,9 @@ create_device_and_queue(const VkPhysicalDevice,
                         const uint32_t queue_family_index);
 VkCommandPool create_command_pool(const VkDevice device,
                                   const uint32_t queue_family_index);
+VkCommandBuffer get_command_buffer(const VkDevice, const VkCommandPool);
+void begin_drawing(const VkCommandBuffer);
+void end_drawing(const VkQueue queue, const VkCommandBuffer command_buffer);
 } // namespace vlk
 
 #endif
