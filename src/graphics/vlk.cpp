@@ -4,14 +4,140 @@
 #include <vulkan/vulkan.h>
 #include <vulkan/vulkan_core.h>
 
-void vlk_panic(VkResult error) {
+void vlk::panic(const VkResult error) {
   std::cout << "[VULKAN] " << string_VkResult(error) << std::endl;
   exit(1);
 }
 
+VkInstance vlk::instance(std::vector<const char *> extensions) {
+  VkInstance instance;
+
+  const char *layer_names[] = {"VK_LAYER_KHRONOS_validation",
+                               "VK_LAYER_LUNARG_api_dump"};
+
+  VkInstanceCreateInfo instance_create_info{
+      .sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO,
+      .enabledLayerCount = 1,
+      .ppEnabledLayerNames = &layer_names[0],
+      .enabledExtensionCount = static_cast<uint32_t>(extensions.size()),
+      .ppEnabledExtensionNames = extensions.data(),
+  };
+
+  if (auto result = vkCreateInstance(&instance_create_info, nullptr, &instance);
+      result != VK_SUCCESS) {
+    vlk::panic(result);
+  }
+
+  return instance;
+}
+
+VkPhysicalDevice vlk::physical_device(const VkInstance instance) {
+  VkPhysicalDevice physical_device;
+
+  uint32_t device_count = 1;
+
+  if (auto error =
+          vkEnumeratePhysicalDevices(instance, &device_count, &physical_device);
+      error != VK_SUCCESS) {
+    vlk::panic(error);
+  }
+
+  return physical_device;
+}
+
+VkSurfaceCapabilitiesKHR
+vlk::surface_capabilities(const VkPhysicalDevice physical_device,
+                          const VkSurfaceKHR surface) {
+  VkSurfaceCapabilitiesKHR surface_capabilities;
+
+  if (auto error = vkGetPhysicalDeviceSurfaceCapabilitiesKHR(
+          physical_device, surface, &surface_capabilities);
+      error != VK_SUCCESS) {
+    vlk::panic(error);
+  }
+
+  return surface_capabilities;
+}
+
+std::pair<VkDevice, VkQueue>
+vlk::device_and_queue(const VkPhysicalDevice physical_device,
+                      const uint32_t queue_family_index) {
+  VkDevice device;
+  VkQueue queue;
+
+  const char *extension_names = "VK_KHR_swapchain";
+  const float queue_priority = 1.0;
+
+  VkDeviceQueueCreateInfo device_queue_create_info{
+      .sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
+      .queueFamilyIndex = queue_family_index,
+      .queueCount = 1,
+      .pQueuePriorities = &queue_priority,
+  };
+
+  VkDeviceCreateInfo device_create_info{
+      .sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
+      .queueCreateInfoCount = 1,
+      .pQueueCreateInfos = &device_queue_create_info,
+      .enabledExtensionCount = 1,
+      .ppEnabledExtensionNames = &extension_names,
+  };
+
+  if (auto error = vkCreateDevice(physical_device, &device_create_info, nullptr,
+                                  &device);
+      error != VK_SUCCESS) {
+    vlk::panic(error);
+  }
+
+  vkGetDeviceQueue(device, queue_family_index, 0, &queue);
+
+  return {
+      device,
+      queue,
+  };
+}
+
+VkCommandPool vlk::command_pool(const VkDevice device,
+                                const uint32_t queue_family_index) {
+  VkCommandPool command_pool;
+
+  VkCommandPoolCreateInfo command_pool_create_info{
+      .sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
+      .queueFamilyIndex = queue_family_index,
+  };
+
+  if (auto error = vkCreateCommandPool(device, &command_pool_create_info,
+                                       nullptr, &command_pool);
+      error != VK_SUCCESS) {
+    vlk::panic(error);
+  }
+
+  return command_pool;
+}
+
+VkCommandBuffer vlk::command_buffer(const VkDevice device,
+                                    const VkCommandPool command_pool) {
+  VkCommandBuffer command_buffer;
+
+  VkCommandBufferAllocateInfo command_buffer_allocate_info{
+      .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
+      .commandPool = command_pool,
+      .level = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
+      .commandBufferCount = 1,
+  };
+
+  if (auto error = vkAllocateCommandBuffers(
+          device, &command_buffer_allocate_info, &command_buffer);
+      error != VK_SUCCESS) {
+    vlk::panic(error);
+  }
+
+  return command_buffer;
+}
+
 VkSwapchainKHR
-create_swapchain(const VkDevice device, const VkSurfaceKHR surface,
-                 const VkSurfaceCapabilitiesKHR surface_capabilities) {
+vlk::swapchain(const VkDevice device, const VkSurfaceKHR surface,
+               const VkSurfaceCapabilitiesKHR surface_capabilities) {
   VkSwapchainKHR swapchain;
 
   VkSwapchainCreateInfoKHR swapchain_create_info{
@@ -28,16 +154,17 @@ create_swapchain(const VkDevice device, const VkSurfaceKHR surface,
       .compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR,
       .presentMode = VK_PRESENT_MODE_FIFO_KHR,
   };
+
   if (auto error = vkCreateSwapchainKHR(device, &swapchain_create_info, nullptr,
                                         &swapchain);
       error != VK_SUCCESS) {
-    vlk_panic(error);
+    vlk::panic(error);
   }
 
   return swapchain;
 }
 
-VkRenderPass create_render_pass(const VkDevice device) {
+VkRenderPass vlk::renderpass(const VkDevice device) {
   VkRenderPass render_pass;
 
   VkAttachmentDescription attachment_description{
@@ -70,47 +197,57 @@ VkRenderPass create_render_pass(const VkDevice device) {
   if (auto error = vkCreateRenderPass(device, &render_pass_create_info, nullptr,
                                       &render_pass);
       error != VK_SUCCESS) {
-    vlk_panic(error);
+    vlk::panic(error);
   }
 
   return render_pass;
 }
 
-VkFramebuffer create_framebuffer(const VkDevice device,
-                                 const VkRenderPass render_pass,
-                                 const VkSwapchainKHR swapchain) {
-  VkFramebuffer framebuffer;
-  VkImageView image_view;
+VkFence vlk::fence(const VkDevice device) {
   VkFence fence;
 
   VkFenceCreateInfo fence_create_info{
       .sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO,
   };
+
   if (auto error = vkCreateFence(device, &fence_create_info, nullptr, &fence);
       error != VK_SUCCESS) {
-    vlk_panic(error);
+    vlk::panic(error);
   }
 
+  return fence;
+}
+
+VkImage vlk::next_swapchain_image(const VkDevice device,
+                                  const VkSwapchainKHR swapchain,
+                                  const VkFence fence) {
   uint32_t image_index;
+
   if (auto error = vkAcquireNextImageKHR(device, swapchain, 1000,
                                          VK_NULL_HANDLE, fence, &image_index);
       error != VK_SUCCESS) {
-    vlk_panic(error);
+    vlk::panic(error);
   }
 
   uint32_t image_count;
   if (auto error =
           vkGetSwapchainImagesKHR(device, swapchain, &image_count, nullptr);
       error != VK_SUCCESS) {
-    vlk_panic(error);
+    vlk::panic(error);
   }
 
-  VkImage images[image_count];
-  if (auto error =
-          vkGetSwapchainImagesKHR(device, swapchain, &image_count, &images[0]);
+  VkImage swapchain_images[image_count];
+  if (auto error = vkGetSwapchainImagesKHR(device, swapchain, &image_count,
+                                           &swapchain_images[0]);
       error != VK_SUCCESS) {
-    vlk_panic(error);
+    vlk::panic(error);
   }
+
+  return swapchain_images[image_index];
+}
+
+VkImageView vlk::image_view(const VkDevice device, const VkImage image) {
+  VkImageView image_view;
 
   VkComponentMapping component_mapping{
       .r = VK_COMPONENT_SWIZZLE_IDENTITY,
@@ -129,18 +266,27 @@ VkFramebuffer create_framebuffer(const VkDevice device,
 
   VkImageViewCreateInfo image_view_create_info{
       .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
-      .image = images[image_index],
+      .image = image,
       .viewType = VK_IMAGE_VIEW_TYPE_2D,
       .format = VK_FORMAT_B8G8R8A8_UNORM,
       .components = component_mapping,
       .subresourceRange = image_subresource_range,
   };
+
   if (auto error = vkCreateImageView(device, &image_view_create_info, nullptr,
                                      &image_view);
       error != VK_SUCCESS) {
-    vlk_panic(error);
+    vlk::panic(error);
   }
 
+  return image_view;
+}
+
+VkFramebuffer vlk::framebuffer(const VkDevice device,
+                               const VkSwapchainKHR swapchain,
+                               const VkRenderPass render_pass,
+                               const VkImageView image_view) {
+  VkFramebuffer framebuffer;
   VkFramebufferCreateInfo framebuffer_create_info{
       .sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO,
       .renderPass = render_pass,
@@ -153,133 +299,10 @@ VkFramebuffer create_framebuffer(const VkDevice device,
   if (auto error = vkCreateFramebuffer(device, &framebuffer_create_info,
                                        nullptr, &framebuffer);
       error != VK_SUCCESS) {
-    vlk_panic(error);
+    vlk::panic(error);
   }
 
   return framebuffer;
-}
-
-VkInstance vlk::create_instance(std::vector<const char *> extensions) {
-  VkInstance instance;
-
-  const char *layer_names[] = {"VK_LAYER_KHRONOS_validation",
-                               "VK_LAYER_LUNARG_api_dump"};
-
-  VkInstanceCreateInfo instance_create_info{
-      .sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO,
-      .enabledLayerCount = 1,
-      .ppEnabledLayerNames = &layer_names[0],
-      .enabledExtensionCount = static_cast<uint32_t>(extensions.size()),
-      .ppEnabledExtensionNames = extensions.data(),
-  };
-
-  if (auto error = vkCreateInstance(&instance_create_info, nullptr, &instance);
-      error != VK_SUCCESS) {
-    vlk_panic(error);
-  }
-
-  return instance;
-}
-
-VkPhysicalDevice vlk::get_physical_device(const VkInstance instance) {
-  VkPhysicalDevice physical_device;
-
-  uint32_t device_count = 1;
-  if (auto error =
-          vkEnumeratePhysicalDevices(instance, &device_count, &physical_device);
-      error != VK_SUCCESS) {
-    vlk_panic(error);
-  }
-
-  return physical_device;
-}
-
-VkSurfaceCapabilitiesKHR
-vlk::get_surface_capabilities(const VkPhysicalDevice physical_device,
-                              const VkSurfaceKHR surface) {
-  VkSurfaceCapabilitiesKHR surface_capabilities;
-
-  if (auto error = vkGetPhysicalDeviceSurfaceCapabilitiesKHR(
-          physical_device, surface, &surface_capabilities);
-      error != VK_SUCCESS) {
-    vlk_panic(error);
-  }
-
-  return surface_capabilities;
-}
-
-std::pair<VkDevice, VkQueue>
-vlk::create_device_and_queue(const VkPhysicalDevice physical_device,
-                             const uint32_t queue_family_index) {
-  VkDevice device;
-  VkQueue queue;
-
-  const char *extension_names = "VK_KHR_swapchain";
-  const float queue_priority = 1.0;
-
-  VkDeviceQueueCreateInfo device_queue_create_info{
-      .sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
-      .queueFamilyIndex = queue_family_index,
-      .queueCount = 1,
-      .pQueuePriorities = &queue_priority,
-  };
-
-  VkDeviceCreateInfo device_create_info{
-      .sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
-      .queueCreateInfoCount = 1,
-      .pQueueCreateInfos = &device_queue_create_info,
-      .enabledExtensionCount = 1,
-      .ppEnabledExtensionNames = &extension_names,
-  };
-
-  if (auto error = vkCreateDevice(physical_device, &device_create_info, nullptr,
-                                  &device);
-      error != VK_SUCCESS) {
-    vlk_panic(error);
-  }
-
-  vkGetDeviceQueue(device, queue_family_index, 0, &queue);
-
-  return {
-      device,
-      queue,
-  };
-}
-
-VkCommandPool vlk::create_command_pool(const VkDevice device,
-                                       const uint32_t queue_family_index) {
-  VkCommandPool command_pool;
-
-  VkCommandPoolCreateInfo command_pool_create_info{
-      .sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
-      .queueFamilyIndex = queue_family_index,
-  };
-  if (auto error = vkCreateCommandPool(device, &command_pool_create_info,
-                                       nullptr, &command_pool);
-      error != VK_SUCCESS) {
-    vlk_panic(error);
-  }
-
-  return command_pool;
-}
-
-VkCommandBuffer vlk::get_command_buffer(const VkDevice device,
-                                        const VkCommandPool command_pool) {
-  VkCommandBuffer command_buffer;
-
-  VkCommandBufferAllocateInfo command_buffer_allocate_info{
-      .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
-      .commandPool = command_pool,
-      .level = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
-      .commandBufferCount = 1,
-  };
-  if (auto error = vkAllocateCommandBuffers(
-          device, &command_buffer_allocate_info, &command_buffer);
-      error != VK_SUCCESS) {
-    vlk_panic(error);
-  }
-
-  return command_buffer;
 }
 
 void vlk::begin_drawing(const VkDevice device,
@@ -293,55 +316,70 @@ void vlk::begin_drawing(const VkDevice device,
   if (auto error =
           vkBeginCommandBuffer(command_buffer, &command_buffer_begin_info);
       error != VK_SUCCESS) {
-    vlk_panic(error);
+    vlk::panic(error);
   }
+}
 
-  VkSwapchainKHR swapchain =
-      create_swapchain(device, surface, surface_capabilities);
-  VkRenderPass render_pass = create_render_pass(device);
-  VkFramebuffer framebuffer =
-      create_framebuffer(device, render_pass, swapchain);
-
+void vlk::begin_render_pass(const VkSurfaceCapabilitiesKHR surface_capabilities,
+                            const VkCommandBuffer command_buffer,
+                            const VkRenderPass renderpass,
+                            const VkFramebuffer framebuffer) {
   VkClearColorValue clear_color_value{
       .float32 = {0.0f, 0.0f, 0.0f, 1.0f},
   };
+
   VkClearValue clear_value{
       .color = clear_color_value,
   };
+
   VkOffset2D offset{
       .x = 0,
       .y = 0,
   };
+
   VkRect2D rect{
       .offset = offset,
       .extent = surface_capabilities.currentExtent,
   };
+
   VkRenderPassBeginInfo render_pass_begin_info{
       .sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
-      .renderPass = render_pass,
+      .renderPass = renderpass,
       .framebuffer = framebuffer,
       .renderArea = rect,
       .clearValueCount = 1,
       .pClearValues = &clear_value,
   };
+
   vkCmdBeginRenderPass(command_buffer, &render_pass_begin_info,
                        VK_SUBPASS_CONTENTS_INLINE);
+}
+
+void vlk::end_render_pass(VkCommandBuffer command_buffer) {
   vkCmdEndRenderPass(command_buffer);
 }
 
-void vlk::end_drawing(const VkQueue queue,
-                      const VkCommandBuffer command_buffer) {
+void vlk::end_drawing(const VkCommandBuffer command_buffer) {
   if (auto error = vkEndCommandBuffer(command_buffer); error != VK_SUCCESS) {
-    vlk_panic(error);
+    vlk::panic(error);
   }
+}
 
+void vlk::submit_command_buffer(const VkQueue queue,
+                                const VkCommandBuffer command_buffer) {
   VkSubmitInfo submit_info{
       .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
       .commandBufferCount = 1,
       .pCommandBuffers = &command_buffer,
   };
+
   if (auto error = vkQueueSubmit(queue, 1, &submit_info, VK_NULL_HANDLE);
       error != VK_SUCCESS) {
-    vlk_panic(error);
+    vlk::panic(error);
   }
+}
+
+void vlk::destroy_swapchain(const VkDevice device,
+                            const VkSwapchainKHR swapchain) {
+  vkDestroySwapchainKHR(device, swapchain, nullptr);
 }

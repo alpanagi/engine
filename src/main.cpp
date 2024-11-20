@@ -1,10 +1,13 @@
 #include "graphics/graphics.h"
+#include "graphics/vlk.h"
 #include "graphics/window.h"
 
 int main(int argc, char *argv[]) {
   Window window("Engine");
-  Graphics graphics(window);
-  window.start_event_loop();
+  VkInstance instance = vlk::instance(window.vulkan_instance_extensions());
+  VkSurfaceKHR surface = window.surface(instance);
+  Graphics graphics(instance, surface);
+  window.start_event_loop(graphics);
 }
 
 // auto meshes = load::meshes();

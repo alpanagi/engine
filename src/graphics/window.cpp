@@ -49,7 +49,7 @@ std::vector<const char *> Window::vulkan_instance_extensions() const {
   return extensions_vector;
 }
 
-void Window::start_event_loop() const {
+void Window::start_event_loop(Graphics graphics) const {
   bool is_running = true;
   while (is_running) {
     SDL_Event event;
@@ -57,6 +57,9 @@ void Window::start_event_loop() const {
       switch (event.type) {
       case SDL_EVENT_WINDOW_CLOSE_REQUESTED:
         is_running = false;
+        break;
+      case SDL_EVENT_WINDOW_RESIZED:
+        graphics.recreate_swapchain();
         break;
       }
     }
