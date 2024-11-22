@@ -1,6 +1,7 @@
 #ifndef _GRAPHICS_GRAPHICS_H
 #define _GRAPHICS_GRAPHICS_H
 
+#include <vector>
 #include <vulkan/vulkan_core.h>
 
 class Graphics {
@@ -9,7 +10,8 @@ public:
   ~Graphics();
 
   void render() const;
-  void recreate_swapchain();
+  void recreate_rendering();
+  void destroy_rendering();
 
 private:
   VkInstance instance;
@@ -18,8 +20,19 @@ private:
   VkDevice device;
   VkQueue queue;
   VkCommandPool command_pool;
+  VkCommandBuffer command_buffer;
+
   VkSurfaceCapabilitiesKHR surface_capabilities;
-  VkSwapchainKHR swapchain;
+
+  VkSwapchainKHR swapchain = VK_NULL_HANDLE;
+  std::vector<VkImage> swapchain_images;
+  std::vector<VkImageView> swapchain_image_views;
+  VkFramebuffer framebuffer;
+  VkRenderPass renderpass;
+
+  VkSemaphore acquire_image_semaphore;
+  VkSemaphore present_semaphore;
+  VkFence in_flight_fence;
 };
 
 #endif

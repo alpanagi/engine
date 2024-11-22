@@ -103,6 +103,7 @@ VkCommandPool vlk::command_pool(const VkDevice device,
 
   VkCommandPoolCreateInfo command_pool_create_info{
       .sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
+      .flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
       .queueFamilyIndex = queue_family_index,
   };
 
@@ -135,6 +136,56 @@ VkCommandBuffer vlk::command_buffer(const VkDevice device,
   return command_buffer;
 }
 
+void vlk::reset_command_buffer(const VkCommandBuffer command_buffer) {
+  if (auto error = vkResetCommandBuffer(command_buffer, 0);
+      error != VK_SUCCESS) {
+    vlk::panic(error);
+  }
+}
+
+VkRenderPass vlk::renderpass(const VkDevice device,
+                             const uint32_t swapchain_image_view_count) {
+  VkRenderPass render_pass;
+
+  std::vector<VkAttachmentDescription> attachment_descriptions;
+  for (int i = 0; i < swapchain_image_view_count; i++) {
+    attachment_descriptions.push_back(VkAttachmentDescription{
+        .format = VK_FORMAT_B8G8R8A8_UNORM,
+        .samples = VK_SAMPLE_COUNT_1_BIT,
+        .loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
+        .storeOp = VK_ATTACHMENT_STORE_OP_STORE,
+        .stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
+        .stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
+        .initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
+        .finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
+    });
+  }
+
+  VkSubpassDescription subpass_description{
+      .pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS,
+      .inputAttachmentCount = 0,
+      .pInputAttachments = nullptr,
+      .colorAttachmentCount = 0,
+      .pColorAttachments = nullptr,
+  };
+
+  VkRenderPassCreateInfo render_pass_create_info{
+      .sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO,
+      .attachmentCount = swapchain_image_view_count,
+      .pAttachments = attachment_descriptions.data(),
+      .subpassCount = 1,
+      .pSubpasses = &subpass_description,
+  };
+
+  if (auto error = vkCreateRenderPass(device, &render_pass_create_info, nullptr,
+                                      &render_pass);
+      error != VK_SUCCESS) {
+    vlk::panic(error);
+  }
+
+  return render_pass;
+}
+
 VkSwapchainKHR
 vlk::swapchain(const VkDevice device, const VkSurfaceKHR surface,
                const VkSurfaceCapabilitiesKHR surface_capabilities) {
@@ -164,71 +215,8 @@ vlk::swapchain(const VkDevice device, const VkSurfaceKHR surface,
   return swapchain;
 }
 
-VkRenderPass vlk::renderpass(const VkDevice device) {
-  VkRenderPass render_pass;
-
-  VkAttachmentDescription attachment_description{
-      .format = VK_FORMAT_B8G8R8A8_UNORM,
-      .samples = VK_SAMPLE_COUNT_1_BIT,
-      .loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
-      .storeOp = VK_ATTACHMENT_STORE_OP_STORE,
-      .stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
-      .stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
-      .initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
-      .finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-  };
-
-  VkSubpassDescription subpass_description{
-      .pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS,
-      .inputAttachmentCount = 0,
-      .pInputAttachments = nullptr,
-      .colorAttachmentCount = 0,
-      .pColorAttachments = nullptr,
-  };
-
-  VkRenderPassCreateInfo render_pass_create_info{
-      .sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO,
-      .attachmentCount = 1,
-      .pAttachments = &attachment_description,
-      .subpassCount = 1,
-      .pSubpasses = &subpass_description,
-  };
-
-  if (auto error = vkCreateRenderPass(device, &render_pass_create_info, nullptr,
-                                      &render_pass);
-      error != VK_SUCCESS) {
-    vlk::panic(error);
-  }
-
-  return render_pass;
-}
-
-VkFence vlk::fence(const VkDevice device) {
-  VkFence fence;
-
-  VkFenceCreateInfo fence_create_info{
-      .sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO,
-  };
-
-  if (auto error = vkCreateFence(device, &fence_create_info, nullptr, &fence);
-      error != VK_SUCCESS) {
-    vlk::panic(error);
-  }
-
-  return fence;
-}
-
-VkImage vlk::next_swapchain_image(const VkDevice device,
-                                  const VkSwapchainKHR swapchain,
-                                  const VkFence fence) {
-  uint32_t image_index;
-
-  if (auto error = vkAcquireNextImageKHR(device, swapchain, 1000,
-                                         VK_NULL_HANDLE, fence, &image_index);
-      error != VK_SUCCESS) {
-    vlk::panic(error);
-  }
-
+std::vector<VkImage> vlk::swapchain_images(const VkDevice device,
+                                           const VkSwapchainKHR swapchain) {
   uint32_t image_count;
   if (auto error =
           vkGetSwapchainImagesKHR(device, swapchain, &image_count, nullptr);
@@ -243,7 +231,71 @@ VkImage vlk::next_swapchain_image(const VkDevice device,
     vlk::panic(error);
   }
 
-  return swapchain_images[image_index];
+  std::vector<VkImage> swapchain_image_vector;
+  for (VkImage image : swapchain_images) {
+    swapchain_image_vector.push_back(image);
+  }
+
+  return swapchain_image_vector;
+}
+
+uint32_t vlk::next_swapchain_image_index(const VkDevice device,
+                                         const VkSwapchainKHR swapchain,
+                                         const VkSemaphore semaphore) {
+  uint32_t image_index;
+
+  if (auto error = vkAcquireNextImageKHR(device, swapchain, 1000, semaphore,
+                                         VK_NULL_HANDLE, &image_index);
+      error != VK_SUCCESS) {
+    vlk::panic(error);
+  }
+
+  return image_index;
+}
+
+VkFence vlk::fence(const VkDevice device) {
+  VkFence fence;
+
+  VkFenceCreateInfo fence_create_info{
+      .sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO,
+      .flags = VK_FENCE_CREATE_SIGNALED_BIT,
+  };
+
+  if (auto error = vkCreateFence(device, &fence_create_info, nullptr, &fence);
+      error != VK_SUCCESS) {
+    vlk::panic(error);
+  }
+
+  return fence;
+}
+
+void vlk::await_fence(const VkDevice device, const VkFence fence) {
+  if (auto error = vkWaitForFences(device, 1, &fence, true, UINT64_MAX);
+      error != VK_SUCCESS) {
+    vlk::panic(error);
+  }
+}
+
+void vlk::reset_fence(const VkDevice device, const VkFence fence) {
+  if (auto error = vkResetFences(device, 1, &fence); error != VK_SUCCESS) {
+    vlk::panic(error);
+  }
+}
+
+VkSemaphore vlk::semaphore(const VkDevice device) {
+  VkSemaphore semaphore;
+
+  VkSemaphoreCreateInfo semaphore_create_info{
+      .sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO,
+  };
+
+  if (auto error = vkCreateSemaphore(device, &semaphore_create_info, nullptr,
+                                     &semaphore);
+      error != VK_SUCCESS) {
+    vlk::panic(error);
+  }
+
+  return semaphore;
 }
 
 VkImageView vlk::image_view(const VkDevice device, const VkImage image) {
@@ -285,13 +337,13 @@ VkImageView vlk::image_view(const VkDevice device, const VkImage image) {
 VkFramebuffer vlk::framebuffer(const VkDevice device,
                                const VkSwapchainKHR swapchain,
                                const VkRenderPass render_pass,
-                               const VkImageView image_view) {
+                               const std::vector<VkImageView> &image_views) {
   VkFramebuffer framebuffer;
   VkFramebufferCreateInfo framebuffer_create_info{
       .sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO,
       .renderPass = render_pass,
-      .attachmentCount = 1,
-      .pAttachments = &image_view,
+      .attachmentCount = static_cast<uint32_t>(image_views.size()),
+      .pAttachments = image_views.data(),
       .width = 800,
       .height = 600,
       .layers = 1,
@@ -306,9 +358,7 @@ VkFramebuffer vlk::framebuffer(const VkDevice device,
 }
 
 void vlk::begin_drawing(const VkDevice device,
-                        const VkCommandBuffer command_buffer,
-                        const VkSurfaceKHR surface,
-                        const VkSurfaceCapabilitiesKHR surface_capabilities) {
+                        const VkCommandBuffer command_buffer) {
   VkCommandBufferBeginInfo command_buffer_begin_info{
       .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
       .flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT,
@@ -323,14 +373,18 @@ void vlk::begin_drawing(const VkDevice device,
 void vlk::begin_render_pass(const VkSurfaceCapabilitiesKHR surface_capabilities,
                             const VkCommandBuffer command_buffer,
                             const VkRenderPass renderpass,
-                            const VkFramebuffer framebuffer) {
+                            const VkFramebuffer framebuffer,
+                            const uint32_t swapchain_image_view_count) {
   VkClearColorValue clear_color_value{
       .float32 = {0.0f, 0.0f, 0.0f, 1.0f},
   };
 
-  VkClearValue clear_value{
-      .color = clear_color_value,
-  };
+  std::vector<VkClearValue> clear_values;
+  for (int i = 0; i < swapchain_image_view_count; i++) {
+    clear_values.push_back(VkClearValue{
+        .color = clear_color_value,
+    });
+  }
 
   VkOffset2D offset{
       .x = 0,
@@ -347,8 +401,8 @@ void vlk::begin_render_pass(const VkSurfaceCapabilitiesKHR surface_capabilities,
       .renderPass = renderpass,
       .framebuffer = framebuffer,
       .renderArea = rect,
-      .clearValueCount = 1,
-      .pClearValues = &clear_value,
+      .clearValueCount = swapchain_image_view_count,
+      .pClearValues = clear_values.data(),
   };
 
   vkCmdBeginRenderPass(command_buffer, &render_pass_begin_info,
@@ -366,20 +420,36 @@ void vlk::end_drawing(const VkCommandBuffer command_buffer) {
 }
 
 void vlk::submit_command_buffer(const VkQueue queue,
-                                const VkCommandBuffer command_buffer) {
+                                const VkCommandBuffer command_buffer,
+                                const VkFence in_flight_fence,
+                                const VkSemaphore acquire_image_semaphore) {
+  uint32_t dst_stages[] = {VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT};
   VkSubmitInfo submit_info{
       .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
+      .waitSemaphoreCount = 1,
+      .pWaitSemaphores = &acquire_image_semaphore,
+      .pWaitDstStageMask = dst_stages,
       .commandBufferCount = 1,
       .pCommandBuffers = &command_buffer,
   };
 
-  if (auto error = vkQueueSubmit(queue, 1, &submit_info, VK_NULL_HANDLE);
+  if (auto error = vkQueueSubmit(queue, 1, &submit_info, in_flight_fence);
       error != VK_SUCCESS) {
     vlk::panic(error);
   }
 }
 
-void vlk::destroy_swapchain(const VkDevice device,
-                            const VkSwapchainKHR swapchain) {
-  vkDestroySwapchainKHR(device, swapchain, nullptr);
+void vlk::present(const VkQueue queue, const VkSwapchainKHR swapchain,
+                  const uint32_t swapchain_image_index) {
+  VkPresentInfoKHR present_info{
+      .sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
+      .swapchainCount = 1,
+      .pSwapchains = &swapchain,
+      .pImageIndices = &swapchain_image_index,
+  };
+
+  if (auto error = vkQueuePresentKHR(queue, &present_info);
+      error != VK_SUCCESS) {
+    vlk::panic(error);
+  }
 }

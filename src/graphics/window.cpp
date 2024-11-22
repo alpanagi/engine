@@ -59,7 +59,12 @@ void Window::start_event_loop(Graphics graphics) const {
         is_running = false;
         break;
       case SDL_EVENT_WINDOW_RESIZED:
-        graphics.recreate_swapchain();
+        graphics.recreate_rendering();
+        break;
+      case SDL_EVENT_KEY_DOWN:
+        if (event.key.key == SDLK_ESCAPE) {
+          is_running = false;
+        }
         break;
       }
     }
