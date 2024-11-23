@@ -14,7 +14,7 @@ public:
 
   VkSurfaceKHR surface(const VkInstance) const;
   std::vector<const char *> vulkan_instance_extensions() const;
-  void start_event_loop(Graphics graphics) const;
+  void start_event_loop(Graphics &graphics) const;
 
 private:
   SDL_Window *window;

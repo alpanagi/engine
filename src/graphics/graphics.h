@@ -9,9 +9,11 @@ public:
   Graphics(const VkInstance instance, const VkSurfaceKHR surface);
   ~Graphics();
 
-  void render() const;
+  void render();
   void recreate_rendering();
   void destroy_rendering();
+
+  bool should_recreate_swapchain = false;
 
 private:
   VkInstance instance;
@@ -27,11 +29,11 @@ private:
   VkSwapchainKHR swapchain = VK_NULL_HANDLE;
   std::vector<VkImage> swapchain_images;
   std::vector<VkImageView> swapchain_image_views;
-  VkFramebuffer framebuffer;
+  std::vector<VkFramebuffer> framebuffers;
   VkRenderPass renderpass;
 
   VkSemaphore acquire_image_semaphore;
-  VkSemaphore present_semaphore;
+  VkSemaphore render_finished_semaphore;
   VkFence in_flight_fence;
 };
 

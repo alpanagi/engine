@@ -27,7 +27,10 @@ Window::Window(const std::string title) {
   window = create_window(title);
 }
 
-Window::~Window() { SDL_Quit(); }
+Window::~Window() {
+  SDL_DestroyWindow(window);
+  SDL_Quit();
+}
 
 VkSurfaceKHR Window::surface(const VkInstance vk_instance) const {
   VkSurfaceKHR surface;
@@ -49,7 +52,7 @@ std::vector<const char *> Window::vulkan_instance_extensions() const {
   return extensions_vector;
 }
 
-void Window::start_event_loop(Graphics graphics) const {
+void Window::start_event_loop(Graphics &graphics) const {
   bool is_running = true;
   while (is_running) {
     SDL_Event event;
@@ -59,7 +62,7 @@ void Window::start_event_loop(Graphics graphics) const {
         is_running = false;
         break;
       case SDL_EVENT_WINDOW_RESIZED:
-        graphics.recreate_rendering();
+        graphics.should_recreate_swapchain = true;
         break;
       case SDL_EVENT_KEY_DOWN:
         if (event.key.key == SDLK_ESCAPE) {
@@ -68,5 +71,10 @@ void Window::start_event_loop(Graphics graphics) const {
         break;
       }
     }
+
+    if (graphics.should_recreate_swapchain) {
+      graphics.recreate_rendering();
+    }
+    graphics.render();
   }
 }

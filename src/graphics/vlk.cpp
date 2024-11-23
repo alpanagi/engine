@@ -65,7 +65,7 @@ vlk::device_and_queue(const VkPhysicalDevice physical_device,
   VkDevice device;
   VkQueue queue;
 
-  const char *extension_names = "VK_KHR_swapchain";
+  const char *extension_names = VK_KHR_SWAPCHAIN_EXTENSION_NAME;
   const float queue_priority = 1.0;
 
   VkDeviceQueueCreateInfo device_queue_create_info{
@@ -143,23 +143,19 @@ void vlk::reset_command_buffer(const VkCommandBuffer command_buffer) {
   }
 }
 
-VkRenderPass vlk::renderpass(const VkDevice device,
-                             const uint32_t swapchain_image_view_count) {
+VkRenderPass vlk::renderpass(const VkDevice device) {
   VkRenderPass render_pass;
 
-  std::vector<VkAttachmentDescription> attachment_descriptions;
-  for (int i = 0; i < swapchain_image_view_count; i++) {
-    attachment_descriptions.push_back(VkAttachmentDescription{
-        .format = VK_FORMAT_B8G8R8A8_UNORM,
-        .samples = VK_SAMPLE_COUNT_1_BIT,
-        .loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
-        .storeOp = VK_ATTACHMENT_STORE_OP_STORE,
-        .stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
-        .stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
-        .initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
-        .finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
-    });
-  }
+  VkAttachmentDescription attachment_description(VkAttachmentDescription{
+      .format = VK_FORMAT_B8G8R8A8_UNORM,
+      .samples = VK_SAMPLE_COUNT_1_BIT,
+      .loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
+      .storeOp = VK_ATTACHMENT_STORE_OP_STORE,
+      .stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
+      .stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
+      .initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
+      .finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
+  });
 
   VkSubpassDescription subpass_description{
       .pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS,
@@ -171,8 +167,8 @@ VkRenderPass vlk::renderpass(const VkDevice device,
 
   VkRenderPassCreateInfo render_pass_create_info{
       .sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO,
-      .attachmentCount = swapchain_image_view_count,
-      .pAttachments = attachment_descriptions.data(),
+      .attachmentCount = 1,
+      .pAttachments = &attachment_description,
       .subpassCount = 1,
       .pSubpasses = &subpass_description,
   };
@@ -239,18 +235,16 @@ std::vector<VkImage> vlk::swapchain_images(const VkDevice device,
   return swapchain_image_vector;
 }
 
-uint32_t vlk::next_swapchain_image_index(const VkDevice device,
-                                         const VkSwapchainKHR swapchain,
-                                         const VkSemaphore semaphore) {
+std::pair<uint32_t, VkResult>
+vlk::next_swapchain_image_index(const VkDevice device,
+                                const VkSwapchainKHR swapchain,
+                                const VkSemaphore semaphore) {
   uint32_t image_index;
 
-  if (auto error = vkAcquireNextImageKHR(device, swapchain, 1000, semaphore,
-                                         VK_NULL_HANDLE, &image_index);
-      error != VK_SUCCESS) {
-    vlk::panic(error);
-  }
+  auto error = vkAcquireNextImageKHR(device, swapchain, UINT64_MAX, semaphore,
+                                     VK_NULL_HANDLE, &image_index);
 
-  return image_index;
+  return {image_index, error};
 }
 
 VkFence vlk::fence(const VkDevice device) {
@@ -334,18 +328,18 @@ VkImageView vlk::image_view(const VkDevice device, const VkImage image) {
   return image_view;
 }
 
-VkFramebuffer vlk::framebuffer(const VkDevice device,
-                               const VkSwapchainKHR swapchain,
-                               const VkRenderPass render_pass,
-                               const std::vector<VkImageView> &image_views) {
+VkFramebuffer
+vlk::framebuffer(const VkDevice device, const VkSwapchainKHR swapchain,
+                 const VkRenderPass render_pass, const VkImageView image_view,
+                 const VkSurfaceCapabilitiesKHR surface_capabilities) {
   VkFramebuffer framebuffer;
   VkFramebufferCreateInfo framebuffer_create_info{
       .sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO,
       .renderPass = render_pass,
-      .attachmentCount = static_cast<uint32_t>(image_views.size()),
-      .pAttachments = image_views.data(),
-      .width = 800,
-      .height = 600,
+      .attachmentCount = 1,
+      .pAttachments = &image_view,
+      .width = surface_capabilities.currentExtent.width,
+      .height = surface_capabilities.currentExtent.height,
       .layers = 1,
   };
   if (auto error = vkCreateFramebuffer(device, &framebuffer_create_info,
@@ -361,7 +355,6 @@ void vlk::begin_drawing(const VkDevice device,
                         const VkCommandBuffer command_buffer) {
   VkCommandBufferBeginInfo command_buffer_begin_info{
       .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
-      .flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT,
   };
   if (auto error =
           vkBeginCommandBuffer(command_buffer, &command_buffer_begin_info);
@@ -375,24 +368,12 @@ void vlk::begin_render_pass(const VkSurfaceCapabilitiesKHR surface_capabilities,
                             const VkRenderPass renderpass,
                             const VkFramebuffer framebuffer,
                             const uint32_t swapchain_image_view_count) {
-  VkClearColorValue clear_color_value{
-      .float32 = {0.0f, 0.0f, 0.0f, 1.0f},
-  };
-
-  std::vector<VkClearValue> clear_values;
-  for (int i = 0; i < swapchain_image_view_count; i++) {
-    clear_values.push_back(VkClearValue{
-        .color = clear_color_value,
-    });
-  }
-
-  VkOffset2D offset{
-      .x = 0,
-      .y = 0,
+  VkClearValue clear_color_value{
+      .color = {0.0f, 0.0f, 0.0f, 1.0f},
   };
 
   VkRect2D rect{
-      .offset = offset,
+      .offset = {0, 0},
       .extent = surface_capabilities.currentExtent,
   };
 
@@ -401,8 +382,8 @@ void vlk::begin_render_pass(const VkSurfaceCapabilitiesKHR surface_capabilities,
       .renderPass = renderpass,
       .framebuffer = framebuffer,
       .renderArea = rect,
-      .clearValueCount = swapchain_image_view_count,
-      .pClearValues = clear_values.data(),
+      .clearValueCount = 1,
+      .pClearValues = &clear_color_value,
   };
 
   vkCmdBeginRenderPass(command_buffer, &render_pass_begin_info,
@@ -422,8 +403,9 @@ void vlk::end_drawing(const VkCommandBuffer command_buffer) {
 void vlk::submit_command_buffer(const VkQueue queue,
                                 const VkCommandBuffer command_buffer,
                                 const VkFence in_flight_fence,
-                                const VkSemaphore acquire_image_semaphore) {
-  uint32_t dst_stages[] = {VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT};
+                                const VkSemaphore acquire_image_semaphore,
+                                const VkSemaphore render_finished_semaphore) {
+  uint32_t dst_stages[] = {VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT};
   VkSubmitInfo submit_info{
       .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
       .waitSemaphoreCount = 1,
@@ -431,6 +413,8 @@ void vlk::submit_command_buffer(const VkQueue queue,
       .pWaitDstStageMask = dst_stages,
       .commandBufferCount = 1,
       .pCommandBuffers = &command_buffer,
+      .signalSemaphoreCount = 1,
+      .pSignalSemaphores = &render_finished_semaphore,
   };
 
   if (auto error = vkQueueSubmit(queue, 1, &submit_info, in_flight_fence);
@@ -439,17 +423,17 @@ void vlk::submit_command_buffer(const VkQueue queue,
   }
 }
 
-void vlk::present(const VkQueue queue, const VkSwapchainKHR swapchain,
-                  const uint32_t swapchain_image_index) {
+VkResult vlk::present(const VkQueue queue, const VkSwapchainKHR swapchain,
+                      const uint32_t swapchain_image_index,
+                      const VkSemaphore render_finished_semaphore) {
   VkPresentInfoKHR present_info{
       .sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
+      .waitSemaphoreCount = 1,
+      .pWaitSemaphores = &render_finished_semaphore,
       .swapchainCount = 1,
       .pSwapchains = &swapchain,
       .pImageIndices = &swapchain_image_index,
   };
 
-  if (auto error = vkQueuePresentKHR(queue, &present_info);
-      error != VK_SUCCESS) {
-    vlk::panic(error);
-  }
+  return vkQueuePresentKHR(queue, &present_info);
 }
