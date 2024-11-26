@@ -8,21 +8,22 @@ Graphics::Graphics(VkInstance instance_, VkSurfaceKHR surface_) {
   instance = instance_;
   surface = surface_;
 
-  physical_device = vlk::physical_device(instance);
+  physical_device = vlk::core::physical_device(instance);
   std::tie(device, queue) =
-      vlk::device_and_queue(physical_device, queue_family_index);
+      vlk::core::device_and_queue(physical_device, queue_family_index);
 
-  command_pool = vlk::command_pool(device, queue_family_index);
-  command_buffer = vlk::command_buffer(device, command_pool);
+  command_pool = vlk::core::command_pool(device, queue_family_index);
+  command_buffer = vlk::command_buffer::create(device, command_pool);
 
-  surface_capabilities = vlk::surface_capabilities(physical_device, surface);
-  renderpass = vlk::renderpass(device);
+  surface_capabilities =
+      vlk::core::surface_capabilities(physical_device, surface);
+  renderpass = vlk::graphics::renderpass(device);
 
   recreate_rendering();
 
-  acquire_image_semaphore = vlk::semaphore(device);
-  render_finished_semaphore = vlk::semaphore(device);
-  in_flight_fence = vlk::fence(device);
+  acquire_image_semaphore = vlk::semaphore::create(device);
+  render_finished_semaphore = vlk::semaphore::create(device);
+  in_flight_fence = vlk::fence::create(device);
 
   render();
 }
@@ -50,18 +51,19 @@ void Graphics::recreate_rendering() {
     destroy_rendering();
   }
 
-  surface_capabilities = vlk::surface_capabilities(physical_device, surface);
-  swapchain = vlk::swapchain(device, surface, surface_capabilities);
-  swapchain_images = vlk::swapchain_images(device, swapchain);
+  surface_capabilities =
+      vlk::core::surface_capabilities(physical_device, surface);
+  swapchain = vlk::graphics::swapchain(device, surface, surface_capabilities);
+  swapchain_images = vlk::graphics::swapchain_images(device, swapchain);
   for (VkImage image : swapchain_images) {
-    VkImageView image_view = vlk::image_view(device, image);
+    VkImageView image_view = vlk::graphics::image_view(device, image);
     swapchain_image_views.push_back(image_view);
   }
 
   for (int i = 0; i < swapchain_image_views.size(); i++) {
-    framebuffers.push_back(vlk::framebuffer(device, swapchain, renderpass,
-                                            swapchain_image_views[i],
-                                            surface_capabilities));
+    framebuffers.push_back(vlk::graphics::framebuffer(
+        device, swapchain, renderpass, swapchain_image_views[i],
+        surface_capabilities));
   }
 }
 
@@ -80,10 +82,11 @@ void Graphics::destroy_rendering() {
 }
 
 void Graphics::render() {
-  vlk::await_fence(device, in_flight_fence);
+  vlk::fence::await(device, in_flight_fence);
 
-  auto [swapchain_image_index, error] = vlk::next_swapchain_image_index(
-      device, swapchain, acquire_image_semaphore);
+  auto [swapchain_image_index, error] =
+      vlk::graphics::next_swapchain_image_index(device, swapchain,
+                                                acquire_image_semaphore);
 
   if (error != VK_SUCCESS) {
     if (error == VK_ERROR_OUT_OF_DATE_KHR) {
@@ -93,20 +96,20 @@ void Graphics::render() {
     }
   }
 
-  vlk::reset_fence(device, in_flight_fence);
+  vlk::fence::reset(device, in_flight_fence);
 
-  vlk::begin_drawing(device, command_buffer);
-  vlk::begin_render_pass(surface_capabilities, command_buffer, renderpass,
-                         framebuffers[swapchain_image_index],
-                         swapchain_image_views.size());
-  vlk::end_render_pass(command_buffer);
-  vlk::end_drawing(command_buffer);
-  vlk::submit_command_buffer(queue, command_buffer, in_flight_fence,
-                             acquire_image_semaphore,
-                             render_finished_semaphore);
+  vlk::drawing::begin(device, command_buffer);
+  vlk::drawing::begin_render_pass(
+      surface_capabilities, command_buffer, renderpass,
+      framebuffers[swapchain_image_index], swapchain_image_views.size());
+  vlk::drawing::end_render_pass(command_buffer);
+  vlk::drawing::end(command_buffer);
+  vlk::command_buffer::submit(queue, command_buffer, in_flight_fence,
+                              acquire_image_semaphore,
+                              render_finished_semaphore);
 
-  error = vlk::present(queue, swapchain, swapchain_image_index,
-                       render_finished_semaphore);
+  error = vlk::drawing::present(queue, swapchain, swapchain_image_index,
+                                render_finished_semaphore);
   if (error != VK_SUCCESS) {
     if (error == VK_ERROR_OUT_OF_DATE_KHR) {
       should_recreate_swapchain = true;

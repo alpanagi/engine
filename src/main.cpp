@@ -4,7 +4,8 @@
 
 int main(int argc, char *argv[]) {
   Window window("Engine");
-  VkInstance instance = vlk::instance(window.vulkan_instance_extensions());
+  VkInstance instance =
+      vlk::core::instance(window.vulkan_instance_extensions());
   VkSurfaceKHR surface = window.surface(instance);
   Graphics graphics(instance, surface);
   window.start_event_loop(graphics);

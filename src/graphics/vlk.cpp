@@ -9,7 +9,7 @@ void vlk::panic(const VkResult error) {
   exit(1);
 }
 
-VkInstance vlk::instance(std::vector<const char *> extensions) {
+VkInstance vlk::core::instance(std::vector<const char *> extensions) {
   VkInstance instance;
 
   const char *layer_names[] = {"VK_LAYER_KHRONOS_validation",
@@ -31,7 +31,7 @@ VkInstance vlk::instance(std::vector<const char *> extensions) {
   return instance;
 }
 
-VkPhysicalDevice vlk::physical_device(const VkInstance instance) {
+VkPhysicalDevice vlk::core::physical_device(const VkInstance instance) {
   VkPhysicalDevice physical_device;
 
   uint32_t device_count = 1;
@@ -46,8 +46,8 @@ VkPhysicalDevice vlk::physical_device(const VkInstance instance) {
 }
 
 VkSurfaceCapabilitiesKHR
-vlk::surface_capabilities(const VkPhysicalDevice physical_device,
-                          const VkSurfaceKHR surface) {
+vlk::core::surface_capabilities(const VkPhysicalDevice physical_device,
+                                const VkSurfaceKHR surface) {
   VkSurfaceCapabilitiesKHR surface_capabilities;
 
   if (auto error = vkGetPhysicalDeviceSurfaceCapabilitiesKHR(
@@ -60,8 +60,8 @@ vlk::surface_capabilities(const VkPhysicalDevice physical_device,
 }
 
 std::pair<VkDevice, VkQueue>
-vlk::device_and_queue(const VkPhysicalDevice physical_device,
-                      const uint32_t queue_family_index) {
+vlk::core::device_and_queue(const VkPhysicalDevice physical_device,
+                            const uint32_t queue_family_index) {
   VkDevice device;
   VkQueue queue;
 
@@ -97,8 +97,8 @@ vlk::device_and_queue(const VkPhysicalDevice physical_device,
   };
 }
 
-VkCommandPool vlk::command_pool(const VkDevice device,
-                                const uint32_t queue_family_index) {
+VkCommandPool vlk::core::command_pool(const VkDevice device,
+                                      const uint32_t queue_family_index) {
   VkCommandPool command_pool;
 
   VkCommandPoolCreateInfo command_pool_create_info{
@@ -116,8 +116,8 @@ VkCommandPool vlk::command_pool(const VkDevice device,
   return command_pool;
 }
 
-VkCommandBuffer vlk::command_buffer(const VkDevice device,
-                                    const VkCommandPool command_pool) {
+VkCommandBuffer vlk::command_buffer::create(const VkDevice device,
+                                            const VkCommandPool command_pool) {
   VkCommandBuffer command_buffer;
 
   VkCommandBufferAllocateInfo command_buffer_allocate_info{
@@ -136,14 +136,82 @@ VkCommandBuffer vlk::command_buffer(const VkDevice device,
   return command_buffer;
 }
 
-void vlk::reset_command_buffer(const VkCommandBuffer command_buffer) {
+void vlk::command_buffer::reset(const VkCommandBuffer command_buffer) {
   if (auto error = vkResetCommandBuffer(command_buffer, 0);
       error != VK_SUCCESS) {
     vlk::panic(error);
   }
 }
 
-VkRenderPass vlk::renderpass(const VkDevice device) {
+void vlk::command_buffer::submit(const VkQueue queue,
+                                 const VkCommandBuffer command_buffer,
+                                 const VkFence in_flight_fence,
+                                 const VkSemaphore acquire_image_semaphore,
+                                 const VkSemaphore render_finished_semaphore) {
+  uint32_t dst_stages[] = {VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT};
+  VkSubmitInfo submit_info{
+      .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
+      .waitSemaphoreCount = 1,
+      .pWaitSemaphores = &acquire_image_semaphore,
+      .pWaitDstStageMask = dst_stages,
+      .commandBufferCount = 1,
+      .pCommandBuffers = &command_buffer,
+      .signalSemaphoreCount = 1,
+      .pSignalSemaphores = &render_finished_semaphore,
+  };
+
+  if (auto error = vkQueueSubmit(queue, 1, &submit_info, in_flight_fence);
+      error != VK_SUCCESS) {
+    vlk::panic(error);
+  }
+}
+
+VkFence vlk::fence::create(const VkDevice device) {
+  VkFence fence;
+
+  VkFenceCreateInfo fence_create_info{
+      .sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO,
+      .flags = VK_FENCE_CREATE_SIGNALED_BIT,
+  };
+
+  if (auto error = vkCreateFence(device, &fence_create_info, nullptr, &fence);
+      error != VK_SUCCESS) {
+    vlk::panic(error);
+  }
+
+  return fence;
+}
+
+void vlk::fence::await(const VkDevice device, const VkFence fence) {
+  if (auto error = vkWaitForFences(device, 1, &fence, true, UINT64_MAX);
+      error != VK_SUCCESS) {
+    vlk::panic(error);
+  }
+}
+
+void vlk::fence::reset(const VkDevice device, const VkFence fence) {
+  if (auto error = vkResetFences(device, 1, &fence); error != VK_SUCCESS) {
+    vlk::panic(error);
+  }
+}
+
+VkSemaphore vlk::semaphore::create(const VkDevice device) {
+  VkSemaphore semaphore;
+
+  VkSemaphoreCreateInfo semaphore_create_info{
+      .sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO,
+  };
+
+  if (auto error = vkCreateSemaphore(device, &semaphore_create_info, nullptr,
+                                     &semaphore);
+      error != VK_SUCCESS) {
+    vlk::panic(error);
+  }
+
+  return semaphore;
+}
+
+VkRenderPass vlk::graphics::renderpass(const VkDevice device) {
   VkRenderPass render_pass;
 
   VkAttachmentDescription attachment_description(VkAttachmentDescription{
@@ -183,8 +251,8 @@ VkRenderPass vlk::renderpass(const VkDevice device) {
 }
 
 VkSwapchainKHR
-vlk::swapchain(const VkDevice device, const VkSurfaceKHR surface,
-               const VkSurfaceCapabilitiesKHR surface_capabilities) {
+vlk::graphics::swapchain(const VkDevice device, const VkSurfaceKHR surface,
+                         const VkSurfaceCapabilitiesKHR surface_capabilities) {
   VkSwapchainKHR swapchain;
 
   VkSwapchainCreateInfoKHR swapchain_create_info{
@@ -211,8 +279,9 @@ vlk::swapchain(const VkDevice device, const VkSurfaceKHR surface,
   return swapchain;
 }
 
-std::vector<VkImage> vlk::swapchain_images(const VkDevice device,
-                                           const VkSwapchainKHR swapchain) {
+std::vector<VkImage>
+vlk::graphics::swapchain_images(const VkDevice device,
+                                const VkSwapchainKHR swapchain) {
   uint32_t image_count;
   if (auto error =
           vkGetSwapchainImagesKHR(device, swapchain, &image_count, nullptr);
@@ -235,64 +304,8 @@ std::vector<VkImage> vlk::swapchain_images(const VkDevice device,
   return swapchain_image_vector;
 }
 
-std::pair<uint32_t, VkResult>
-vlk::next_swapchain_image_index(const VkDevice device,
-                                const VkSwapchainKHR swapchain,
-                                const VkSemaphore semaphore) {
-  uint32_t image_index;
-
-  auto error = vkAcquireNextImageKHR(device, swapchain, UINT64_MAX, semaphore,
-                                     VK_NULL_HANDLE, &image_index);
-
-  return {image_index, error};
-}
-
-VkFence vlk::fence(const VkDevice device) {
-  VkFence fence;
-
-  VkFenceCreateInfo fence_create_info{
-      .sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO,
-      .flags = VK_FENCE_CREATE_SIGNALED_BIT,
-  };
-
-  if (auto error = vkCreateFence(device, &fence_create_info, nullptr, &fence);
-      error != VK_SUCCESS) {
-    vlk::panic(error);
-  }
-
-  return fence;
-}
-
-void vlk::await_fence(const VkDevice device, const VkFence fence) {
-  if (auto error = vkWaitForFences(device, 1, &fence, true, UINT64_MAX);
-      error != VK_SUCCESS) {
-    vlk::panic(error);
-  }
-}
-
-void vlk::reset_fence(const VkDevice device, const VkFence fence) {
-  if (auto error = vkResetFences(device, 1, &fence); error != VK_SUCCESS) {
-    vlk::panic(error);
-  }
-}
-
-VkSemaphore vlk::semaphore(const VkDevice device) {
-  VkSemaphore semaphore;
-
-  VkSemaphoreCreateInfo semaphore_create_info{
-      .sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO,
-  };
-
-  if (auto error = vkCreateSemaphore(device, &semaphore_create_info, nullptr,
-                                     &semaphore);
-      error != VK_SUCCESS) {
-    vlk::panic(error);
-  }
-
-  return semaphore;
-}
-
-VkImageView vlk::image_view(const VkDevice device, const VkImage image) {
+VkImageView vlk::graphics::image_view(const VkDevice device,
+                                      const VkImage image) {
   VkImageView image_view;
 
   VkComponentMapping component_mapping{
@@ -328,10 +341,10 @@ VkImageView vlk::image_view(const VkDevice device, const VkImage image) {
   return image_view;
 }
 
-VkFramebuffer
-vlk::framebuffer(const VkDevice device, const VkSwapchainKHR swapchain,
-                 const VkRenderPass render_pass, const VkImageView image_view,
-                 const VkSurfaceCapabilitiesKHR surface_capabilities) {
+VkFramebuffer vlk::graphics::framebuffer(
+    const VkDevice device, const VkSwapchainKHR swapchain,
+    const VkRenderPass render_pass, const VkImageView image_view,
+    const VkSurfaceCapabilitiesKHR surface_capabilities) {
   VkFramebuffer framebuffer;
   VkFramebufferCreateInfo framebuffer_create_info{
       .sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO,
@@ -351,8 +364,20 @@ vlk::framebuffer(const VkDevice device, const VkSwapchainKHR swapchain,
   return framebuffer;
 }
 
-void vlk::begin_drawing(const VkDevice device,
-                        const VkCommandBuffer command_buffer) {
+std::pair<uint32_t, VkResult>
+vlk::graphics::next_swapchain_image_index(const VkDevice device,
+                                          const VkSwapchainKHR swapchain,
+                                          const VkSemaphore semaphore) {
+  uint32_t image_index;
+
+  auto error = vkAcquireNextImageKHR(device, swapchain, UINT64_MAX, semaphore,
+                                     VK_NULL_HANDLE, &image_index);
+
+  return {image_index, error};
+}
+
+void vlk::drawing::begin(const VkDevice device,
+                         const VkCommandBuffer command_buffer) {
   VkCommandBufferBeginInfo command_buffer_begin_info{
       .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
   };
@@ -363,11 +388,11 @@ void vlk::begin_drawing(const VkDevice device,
   }
 }
 
-void vlk::begin_render_pass(const VkSurfaceCapabilitiesKHR surface_capabilities,
-                            const VkCommandBuffer command_buffer,
-                            const VkRenderPass renderpass,
-                            const VkFramebuffer framebuffer,
-                            const uint32_t swapchain_image_view_count) {
+void vlk::drawing::begin_render_pass(
+    const VkSurfaceCapabilitiesKHR surface_capabilities,
+    const VkCommandBuffer command_buffer, const VkRenderPass renderpass,
+    const VkFramebuffer framebuffer,
+    const uint32_t swapchain_image_view_count) {
   VkClearValue clear_color_value{
       .color = {0.0f, 0.0f, 0.0f, 1.0f},
   };
@@ -390,42 +415,20 @@ void vlk::begin_render_pass(const VkSurfaceCapabilitiesKHR surface_capabilities,
                        VK_SUBPASS_CONTENTS_INLINE);
 }
 
-void vlk::end_render_pass(VkCommandBuffer command_buffer) {
+void vlk::drawing::end_render_pass(VkCommandBuffer command_buffer) {
   vkCmdEndRenderPass(command_buffer);
 }
 
-void vlk::end_drawing(const VkCommandBuffer command_buffer) {
+void vlk::drawing::end(const VkCommandBuffer command_buffer) {
   if (auto error = vkEndCommandBuffer(command_buffer); error != VK_SUCCESS) {
     vlk::panic(error);
   }
 }
 
-void vlk::submit_command_buffer(const VkQueue queue,
-                                const VkCommandBuffer command_buffer,
-                                const VkFence in_flight_fence,
-                                const VkSemaphore acquire_image_semaphore,
-                                const VkSemaphore render_finished_semaphore) {
-  uint32_t dst_stages[] = {VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT};
-  VkSubmitInfo submit_info{
-      .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
-      .waitSemaphoreCount = 1,
-      .pWaitSemaphores = &acquire_image_semaphore,
-      .pWaitDstStageMask = dst_stages,
-      .commandBufferCount = 1,
-      .pCommandBuffers = &command_buffer,
-      .signalSemaphoreCount = 1,
-      .pSignalSemaphores = &render_finished_semaphore,
-  };
-
-  if (auto error = vkQueueSubmit(queue, 1, &submit_info, in_flight_fence);
-      error != VK_SUCCESS) {
-    vlk::panic(error);
-  }
-}
-
-VkResult vlk::present(const VkQueue queue, const VkSwapchainKHR swapchain,
-                      const uint32_t swapchain_image_index,
-                      const VkSemaphore render_finished_semaphore) {
+VkResult vlk::drawing::present(const VkQueue queue,
+                               const VkSwapchainKHR swapchain,
+                               const uint32_t swapchain_image_index,
+                               const VkSemaphore render_finished_semaphore) {
   VkPresentInfoKHR present_info{
       .sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
       .waitSemaphoreCount = 1,
