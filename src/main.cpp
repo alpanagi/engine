@@ -12,4 +12,5 @@ int main() {
 
   auto instance = vlk::create_instance(extension_names);
   auto physical_device = vlk::get_physical_device(instance);
+  auto [device, queue] = vlk::create_device(physical_device);
 }

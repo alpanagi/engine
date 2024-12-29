@@ -43,3 +43,34 @@ VkPhysicalDevice vlk::get_physical_device(const VkInstance instance) {
 
   return physical_device;
 }
+
+std::pair<VkDevice, VkQueue>
+vlk::create_device(const VkPhysicalDevice physical_device) {
+  VkDevice device;
+
+  const float queue_priorities = 1;
+
+  VkDeviceQueueCreateInfo vk_device_queue_create_info{
+      .sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
+      .queueFamilyIndex = 0,
+      .queueCount = 1,
+      .pQueuePriorities = &queue_priorities,
+  };
+
+  VkDeviceCreateInfo vk_device_create_info{
+      .sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
+      .queueCreateInfoCount = 1,
+      .pQueueCreateInfos = &vk_device_queue_create_info,
+  };
+
+  if (auto error = vkCreateDevice(physical_device, &vk_device_create_info,
+                                  nullptr, &device);
+      error != VK_SUCCESS) {
+    panik::crash(panik::component::vulkan, string_VkResult(error));
+  }
+
+  VkQueue queue;
+  vkGetDeviceQueue(device, 0, 0, &queue);
+
+  return {device, queue};
+}
