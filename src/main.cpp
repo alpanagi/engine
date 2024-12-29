@@ -5,5 +5,9 @@
 
 int main() {
   sdlk::initialize();
-  vlk::create_instance();
+  auto window = sdlk::create_window("engine");
+
+  std::vector<std::string> extension_names =
+      sdlk::get_required_vulkan_extensions();
+  vlk::create_instance(extension_names);
 }

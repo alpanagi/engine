@@ -16,4 +16,5 @@ target_sources(engine PRIVATE
   src/main.cpp
   src/sdlk.cpp
   src/vlk.cpp
+  src/panik.cpp
 )
