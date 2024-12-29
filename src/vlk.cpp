@@ -1,6 +1,7 @@
 #include "vlk.h"
 #include "panik.h"
 #include "vulkan/vk_enum_string_helper.h"
+#include <vulkan/vulkan_core.h>
 
 VkInstance
 vlk::create_instance(const std::vector<std::string> &extension_names) {
@@ -28,4 +29,17 @@ vlk::create_instance(const std::vector<std::string> &extension_names) {
   }
 
   return instance;
+}
+
+VkPhysicalDevice vlk::get_physical_device(const VkInstance instance) {
+  VkPhysicalDevice physical_device;
+
+  uint32_t count = 1;
+  if (auto error =
+          vkEnumeratePhysicalDevices(instance, &count, &physical_device);
+      error != VK_SUCCESS) {
+    panik::crash(panik::component::vulkan, string_VkResult(error));
+  }
+
+  return physical_device;
 }

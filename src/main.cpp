@@ -9,5 +9,7 @@ int main() {
 
   std::vector<std::string> extension_names =
       sdlk::get_required_vulkan_extensions();
-  vlk::create_instance(extension_names);
+
+  auto instance = vlk::create_instance(extension_names);
+  auto physical_device = vlk::get_physical_device(instance);
 }

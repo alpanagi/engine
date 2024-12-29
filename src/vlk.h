@@ -7,6 +7,7 @@
 
 namespace vlk {
 VkInstance create_instance(const std::vector<std::string> &extensions_names);
-}
+VkPhysicalDevice get_physical_device(const VkInstance);
+} // namespace vlk
 
 #endif
