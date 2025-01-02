@@ -15,6 +15,7 @@ private:
 
 public:
   Graphics(const VkInstance);
+  void render();
 };
 
 #endif

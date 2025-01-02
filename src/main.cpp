@@ -13,4 +13,5 @@ int main() {
   auto instance = vlk::create_instance(extension_names);
 
   Graphics graphics(instance);
+  graphics.render();
 }

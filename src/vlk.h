@@ -12,8 +12,13 @@ std::pair<VkDevice, VkQueue> create_device(const VkPhysicalDevice,
                                            const uint32_t queue_family_index);
 VkCommandPool create_command_pool(const VkDevice,
                                   const uint32_t queue_family_index);
+void submit_queue(const VkQueue queue, const VkCommandBuffer command_buffer);
 
-VkCommandBuffer create_command_buffer(const VkDevice, const VkCommandPool);
+namespace command_buffer {
+VkCommandBuffer create(const VkDevice, const VkCommandPool);
+void begin(const VkCommandBuffer);
+void end(const VkCommandBuffer);
+} // namespace command_buffer
 } // namespace vlk
 
 #endif

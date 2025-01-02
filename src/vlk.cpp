@@ -76,6 +76,17 @@ vlk::create_device(const VkPhysicalDevice physical_device,
   return {device, queue};
 }
 
+void vlk::submit_queue(const VkQueue queue,
+                       const VkCommandBuffer command_buffer) {
+  VkSubmitInfo vk_submit_info{
+      .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
+      .commandBufferCount = 1,
+      .pCommandBuffers = &command_buffer,
+  };
+
+  vkQueueSubmit(queue, 1, &vk_submit_info, nullptr);
+}
+
 VkCommandPool vlk::create_command_pool(const VkDevice device,
                                        const uint32_t queue_family_index) {
   VkCommandPool command_pool;
@@ -94,8 +105,8 @@ VkCommandPool vlk::create_command_pool(const VkDevice device,
   return command_pool;
 }
 
-VkCommandBuffer vlk::create_command_buffer(const VkDevice device,
-                                           const VkCommandPool command_pool) {
+VkCommandBuffer vlk::command_buffer::create(const VkDevice device,
+                                            const VkCommandPool command_pool) {
   VkCommandBuffer command_buffer;
 
   VkCommandBufferAllocateInfo vk_command_buffer_allocate_info{
@@ -105,8 +116,29 @@ VkCommandBuffer vlk::create_command_buffer(const VkDevice device,
       .commandBufferCount = 1,
   };
 
-  vkAllocateCommandBuffers(device, &vk_command_buffer_allocate_info,
-                           &command_buffer);
+  if (auto error = vkAllocateCommandBuffers(
+          device, &vk_command_buffer_allocate_info, &command_buffer);
+      error != VK_SUCCESS) {
+    panik::crash(panik::component::vulkan, string_VkResult(error));
+  }
 
   return command_buffer;
+}
+
+void vlk::command_buffer::begin(const VkCommandBuffer command_buffer) {
+  VkCommandBufferBeginInfo vk_command_buffer_begin_info{
+      .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
+  };
+
+  if (auto error =
+          vkBeginCommandBuffer(command_buffer, &vk_command_buffer_begin_info);
+      error != VK_SUCCESS) {
+    panik::crash(panik::component::vulkan, string_VkResult(error));
+  }
+}
+
+void vlk::command_buffer::end(const VkCommandBuffer command_buffer) {
+  if (auto error = vkEndCommandBuffer(command_buffer); error != VK_SUCCESS) {
+    panik::crash(panik::component::vulkan, string_VkResult(error));
+  }
 }
