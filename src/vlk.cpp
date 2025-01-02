@@ -45,14 +45,15 @@ VkPhysicalDevice vlk::get_physical_device(const VkInstance instance) {
 }
 
 std::pair<VkDevice, VkQueue>
-vlk::create_device(const VkPhysicalDevice physical_device) {
+vlk::create_device(const VkPhysicalDevice physical_device,
+                   const uint32_t queue_family_index) {
   VkDevice device;
 
   const float queue_priorities = 1;
 
   VkDeviceQueueCreateInfo vk_device_queue_create_info{
       .sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
-      .queueFamilyIndex = 0,
+      .queueFamilyIndex = queue_family_index,
       .queueCount = 1,
       .pQueuePriorities = &queue_priorities,
   };
@@ -73,4 +74,39 @@ vlk::create_device(const VkPhysicalDevice physical_device) {
   vkGetDeviceQueue(device, 0, 0, &queue);
 
   return {device, queue};
+}
+
+VkCommandPool vlk::create_command_pool(const VkDevice device,
+                                       const uint32_t queue_family_index) {
+  VkCommandPool command_pool;
+
+  VkCommandPoolCreateInfo vk_command_pool_create_info{
+      .sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
+      .queueFamilyIndex = queue_family_index,
+  };
+
+  if (auto error = vkCreateCommandPool(device, &vk_command_pool_create_info,
+                                       nullptr, &command_pool);
+      error != VK_SUCCESS) {
+    panik::crash(panik::component::vulkan, string_VkResult(error));
+  }
+
+  return command_pool;
+}
+
+VkCommandBuffer vlk::create_command_buffer(const VkDevice device,
+                                           const VkCommandPool command_pool) {
+  VkCommandBuffer command_buffer;
+
+  VkCommandBufferAllocateInfo vk_command_buffer_allocate_info{
+      .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
+      .commandPool = command_pool,
+      .level = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
+      .commandBufferCount = 1,
+  };
+
+  vkAllocateCommandBuffers(device, &vk_command_buffer_allocate_info,
+                           &command_buffer);
+
+  return command_buffer;
 }

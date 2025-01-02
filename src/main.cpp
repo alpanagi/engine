@@ -12,5 +12,10 @@ int main() {
 
   auto instance = vlk::create_instance(extension_names);
   auto physical_device = vlk::get_physical_device(instance);
-  auto [device, queue] = vlk::create_device(physical_device);
+
+  uint32_t queue_family_index;
+  auto [device, queue] =
+      vlk::create_device(physical_device, queue_family_index);
+  auto command_pool = vlk::create_command_pool(device, queue_family_index);
+  auto command_buffer = vlk::create_command_buffer(device, command_pool);
 }
