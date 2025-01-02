@@ -58,10 +58,14 @@ vlk::create_device(const VkPhysicalDevice physical_device,
       .pQueuePriorities = &queue_priorities,
   };
 
+  const char *extension_names = "VK_KHR_swapchain";
+
   VkDeviceCreateInfo vk_device_create_info{
       .sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
       .queueCreateInfoCount = 1,
       .pQueueCreateInfos = &vk_device_queue_create_info,
+      .enabledExtensionCount = 1,
+      .ppEnabledExtensionNames = &extension_names,
   };
 
   if (auto error = vkCreateDevice(physical_device, &vk_device_create_info,
@@ -76,6 +80,48 @@ vlk::create_device(const VkPhysicalDevice physical_device,
   return {device, queue};
 }
 
+VkSurfaceCapabilitiesKHR
+vlk::get_surface_capabilities(const VkPhysicalDevice physical_device,
+                              const VkSurfaceKHR surface) {
+  VkSurfaceCapabilitiesKHR surface_capabilities;
+
+  if (auto error = vkGetPhysicalDeviceSurfaceCapabilitiesKHR(
+          physical_device, surface, &surface_capabilities);
+      error != VK_SUCCESS) {
+    panik::crash(panik::component::vulkan, string_VkResult(error));
+  }
+
+  return surface_capabilities;
+}
+
+VkSwapchainKHR
+vlk::create_swapchain(const VkDevice device, const VkSurfaceKHR surface,
+                      const VkSurfaceCapabilitiesKHR surface_capabilities) {
+  VkSwapchainKHR swapchain;
+
+  VkSwapchainCreateInfoKHR vk_swapchain_create_info{
+      .sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR,
+      .surface = surface,
+      .minImageCount = surface_capabilities.minImageCount,
+      .imageFormat = VK_FORMAT_B8G8R8A8_UNORM,
+      .imageColorSpace = VK_COLORSPACE_SRGB_NONLINEAR_KHR,
+      .imageExtent = surface_capabilities.currentExtent,
+      .imageArrayLayers = 1,
+      .imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
+      .preTransform = VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR,
+      .compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR,
+      .presentMode = VK_PRESENT_MODE_FIFO_KHR,
+  };
+
+  if (auto error = vkCreateSwapchainKHR(device, &vk_swapchain_create_info,
+                                        nullptr, &swapchain);
+      error != VK_SUCCESS) {
+    panik::crash(panik::component::vulkan, string_VkResult(error));
+  }
+
+  return swapchain;
+}
+
 void vlk::submit_queue(const VkQueue queue,
                        const VkCommandBuffer command_buffer) {
   VkSubmitInfo vk_submit_info{
@@ -84,7 +130,23 @@ void vlk::submit_queue(const VkQueue queue,
       .pCommandBuffers = &command_buffer,
   };
 
-  vkQueueSubmit(queue, 1, &vk_submit_info, nullptr);
+  if (auto error = vkQueueSubmit(queue, 1, &vk_submit_info, nullptr);
+      error != VK_SUCCESS) {
+    panik::crash(panik::component::vulkan, string_VkResult(error));
+  }
+}
+
+void vlk::present(const VkQueue queue, const VkSwapchainKHR swapchain) {
+  VkPresentInfoKHR vk_present_info{
+      .sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
+      .swapchainCount = 1,
+      .pSwapchains = &swapchain,
+  };
+
+  if (auto error = vkQueuePresentKHR(queue, &vk_present_info);
+      error != VK_SUCCESS) {
+    panik::crash(panik::component::vulkan, string_VkResult(error));
+  }
 }
 
 VkCommandPool vlk::create_command_pool(const VkDevice device,

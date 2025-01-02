@@ -12,6 +12,7 @@ int main() {
       sdlk::get_required_vulkan_extensions();
   auto instance = vlk::create_instance(extension_names);
 
-  Graphics graphics(instance);
+  auto surface = sdlk::create_surface(window, instance);
+  Graphics graphics(instance, surface);
   graphics.render();
 }

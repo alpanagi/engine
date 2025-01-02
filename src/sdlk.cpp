@@ -19,6 +19,17 @@ SDL_Window *sdlk::create_window(const std::string &title) {
   return window;
 }
 
+VkSurfaceKHR sdlk::create_surface(SDL_Window *window,
+                                  const VkInstance instance) {
+  VkSurfaceKHR surface;
+
+  if (!SDL_Vulkan_CreateSurface(window, instance, nullptr, &surface)) {
+    panik::crash(panik::component::sdl, SDL_GetError());
+  }
+
+  return surface;
+}
+
 std::vector<std::string> sdlk::get_required_vulkan_extensions() {
   std::vector<std::string> string_extension_names;
 
@@ -26,7 +37,7 @@ std::vector<std::string> sdlk::get_required_vulkan_extensions() {
   auto extension_names = SDL_Vulkan_GetInstanceExtensions(&count);
 
   for (int i = 0; i < count; i++) {
-    string_extension_names.emplace_back(extension_names[count]);
+    string_extension_names.emplace_back(extension_names[i]);
   }
 
   return string_extension_names;
