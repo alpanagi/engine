@@ -41,10 +41,10 @@ VkSemaphore create(const VkDevice);
 }
 
 namespace render_pass {
-VkRenderPass create(const VkDevice device);
-void begin(const VkCommandBuffer command_buffer, const VkRenderPass,
-           const VkFramebuffer);
-void end(const VkCommandBuffer command_buffer, const VkRenderPass);
+VkRenderPass create(const VkDevice);
+void begin(const VkCommandBuffer, const VkRenderPass, const VkFramebuffer,
+           const VkSurfaceCapabilitiesKHR);
+void end(const VkCommandBuffer);
 } // namespace render_pass
 } // namespace vlk
 

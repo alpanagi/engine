@@ -237,9 +237,16 @@ VkRenderPass vlk::render_pass::create(const VkDevice device) {
   return render_pass;
 }
 
-void vlk::render_pass::begin(const VkCommandBuffer command_buffer,
-                             const VkRenderPass render_pass,
-                             const VkFramebuffer frame_buffer) {
+void vlk::render_pass::begin(
+    const VkCommandBuffer command_buffer, const VkRenderPass render_pass,
+    const VkFramebuffer frame_buffer,
+    const VkSurfaceCapabilitiesKHR surface_capabilities) {
+
+  VkRect2D render_area{
+      .offset = {.x = 0, .y = 0},
+      .extent = surface_capabilities.currentExtent,
+  };
+
   VkClearValue clear_value = {
       .color = {0.0, 0.0, 0.0, 1.0},
   };
@@ -248,12 +255,17 @@ void vlk::render_pass::begin(const VkCommandBuffer command_buffer,
       .sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
       .renderPass = render_pass,
       .framebuffer = frame_buffer,
+      .renderArea = render_area,
       .clearValueCount = 1,
       .pClearValues = &clear_value,
   };
 
   vkCmdBeginRenderPass(command_buffer, &vk_render_pass_begin_info,
                        VK_SUBPASS_CONTENTS_INLINE);
+}
+
+void vlk::render_pass::end(const VkCommandBuffer command_buffer) {
+  vkCmdEndRenderPass(command_buffer);
 }
 
 VkCommandPool vlk::create_command_pool(const VkDevice device,

@@ -33,6 +33,9 @@ void Graphics::render() {
   auto image_index =
       vlk::get_next_swapchain_image(device, swapchain, swapchain_semaphore);
   vlk::command_buffer::begin(command_buffer);
+  vlk::render_pass::begin(command_buffer, render_pass, framebuffer,
+                          surface_capabilities);
+  vlk::render_pass::end(command_buffer);
   vlk::command_buffer::end(command_buffer);
   vlk::submit_queue(queue, command_buffer);
   vlk::present(queue, swapchain, swapchain_semaphore, image_index);
