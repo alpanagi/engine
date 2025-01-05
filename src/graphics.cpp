@@ -22,12 +22,15 @@ Graphics::Graphics(const VkInstance instance_, const VkSurfaceKHR surface_) {
 
   command_pool = vlk::create_command_pool(device, queue_family_index);
   command_buffer = vlk::command_buffer::create(device, command_pool);
+
+  swapchain_semaphore = vlk::semaphore::create(device);
 }
 
 void Graphics::render() {
-  auto image_index = vlk::get_next_swapchain_image(device, swapchain);
+  auto image_index =
+      vlk::get_next_swapchain_image(device, swapchain, swapchain_semaphore);
   vlk::command_buffer::begin(command_buffer);
   vlk::command_buffer::end(command_buffer);
   vlk::submit_queue(queue, command_buffer);
-  vlk::present(queue, swapchain, image_index);
+  vlk::present(queue, swapchain, swapchain_semaphore, image_index);
 }

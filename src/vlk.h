@@ -18,18 +18,24 @@ VkSwapchainKHR create_swapchain(const VkDevice, const VkSurfaceKHR,
                                 const VkSurfaceCapabilitiesKHR);
 std::vector<VkImage> get_swapchain_images(const VkDevice, const VkSwapchainKHR);
 uint32_t get_next_swapchain_image(const VkDevice device,
-                                  const VkSwapchainKHR swapchain);
+                                  const VkSwapchainKHR swapchain,
+                                  const VkSemaphore semaphore);
 
 VkCommandPool create_command_pool(const VkDevice,
                                   const uint32_t queue_family_index);
 void submit_queue(const VkQueue, const VkCommandBuffer);
-void present(const VkQueue, const VkSwapchainKHR, const uint32_t image_index);
+void present(const VkQueue, const VkSwapchainKHR,
+             const VkSemaphore swapchain_semaphore, const uint32_t image_index);
 
 namespace command_buffer {
 VkCommandBuffer create(const VkDevice, const VkCommandPool);
 void begin(const VkCommandBuffer);
 void end(const VkCommandBuffer);
 } // namespace command_buffer
+
+namespace semaphore {
+VkSemaphore create(const VkDevice);
+}
 } // namespace vlk
 
 #endif

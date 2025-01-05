@@ -20,6 +20,8 @@ private:
   VkCommandPool command_pool;
   VkCommandBuffer command_buffer;
 
+  VkSemaphore swapchain_semaphore;
+
 public:
   Graphics(const VkInstance, const VkSurfaceKHR);
   void render();

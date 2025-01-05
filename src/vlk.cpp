@@ -141,10 +141,11 @@ std::vector<VkImage> vlk::get_swapchain_images(const VkDevice device,
 }
 
 uint32_t vlk::get_next_swapchain_image(const VkDevice device,
-                                       const VkSwapchainKHR swapchain) {
+                                       const VkSwapchainKHR swapchain,
+                                       const VkSemaphore swapchain_semaphore) {
   uint32_t image_index;
-  if (auto error = vkAcquireNextImageKHR(device, swapchain, 0, nullptr, nullptr,
-                                         &image_index);
+  if (auto error = vkAcquireNextImageKHR(
+          device, swapchain, 0, swapchain_semaphore, nullptr, &image_index);
       error != VK_SUCCESS) {
     panik::crash(panik::component::vulkan, string_VkResult(error));
   }
@@ -167,9 +168,12 @@ void vlk::submit_queue(const VkQueue queue,
 }
 
 void vlk::present(const VkQueue queue, const VkSwapchainKHR swapchain,
+                  const VkSemaphore swapchain_semaphore,
                   const uint32_t image_index) {
   VkPresentInfoKHR vk_present_info{
       .sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
+      .waitSemaphoreCount = 1,
+      .pWaitSemaphores = &swapchain_semaphore,
       .swapchainCount = 1,
       .pSwapchains = &swapchain,
       .pImageIndices = &image_index,
@@ -235,4 +239,19 @@ void vlk::command_buffer::end(const VkCommandBuffer command_buffer) {
   if (auto error = vkEndCommandBuffer(command_buffer); error != VK_SUCCESS) {
     panik::crash(panik::component::vulkan, string_VkResult(error));
   }
+}
+
+VkSemaphore vlk::semaphore::create(const VkDevice device) {
+  VkSemaphore semaphore;
+
+  VkSemaphoreCreateInfo vk_semaphore_create_info{
+      .sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO,
+  };
+
+  if (auto error = vkCreateSemaphore(device, &vk_semaphore_create_info, nullptr,
+                                     &semaphore);
+      error != VK_SUCCESS) {
+    panik::crash(panik::component::vulkan, string_VkResult(error));
+  }
+  return semaphore;
 }
