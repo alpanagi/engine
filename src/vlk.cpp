@@ -185,6 +185,77 @@ void vlk::present(const VkQueue queue, const VkSwapchainKHR swapchain,
   }
 }
 
+VkFramebuffer
+vlk::create_framebuffer(const VkDevice device, const VkRenderPass render_pass,
+                        const VkSurfaceCapabilitiesKHR surface_capabilities) {
+  VkFramebuffer framebuffer;
+
+  VkFramebufferCreateInfo vk_framebuffer_create_info{
+      .sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO,
+      .renderPass = render_pass,
+      .attachmentCount = 0,
+      .pAttachments = nullptr,
+      .width = surface_capabilities.currentExtent.width,
+      .height = surface_capabilities.currentExtent.height,
+      .layers = 1,
+  };
+
+  if (auto error = vkCreateFramebuffer(device, &vk_framebuffer_create_info,
+                                       nullptr, &framebuffer);
+      error != VK_SUCCESS) {
+    panik::crash(panik::component::vulkan, string_VkResult(error));
+  }
+
+  return framebuffer;
+}
+
+VkRenderPass vlk::render_pass::create(const VkDevice device) {
+  VkRenderPass render_pass;
+
+  VkSubpassDescription vk_subpass_description{
+      .pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS,
+      .inputAttachmentCount = 0,
+      .pInputAttachments = nullptr,
+      .colorAttachmentCount = 0,
+      .pColorAttachments = nullptr,
+  };
+
+  VkRenderPassCreateInfo vk_render_pass_create_info{
+      .sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO,
+      .attachmentCount = 0,
+      .pAttachments = nullptr,
+      .subpassCount = 1,
+      .pSubpasses = &vk_subpass_description,
+  };
+
+  if (auto error = vkCreateRenderPass(device, &vk_render_pass_create_info,
+                                      nullptr, &render_pass);
+      error != VK_SUCCESS) {
+    panik::crash(panik::component::vulkan, string_VkResult(error));
+  }
+
+  return render_pass;
+}
+
+void vlk::render_pass::begin(const VkCommandBuffer command_buffer,
+                             const VkRenderPass render_pass,
+                             const VkFramebuffer frame_buffer) {
+  VkClearValue clear_value = {
+      .color = {0.0, 0.0, 0.0, 1.0},
+  };
+
+  VkRenderPassBeginInfo vk_render_pass_begin_info{
+      .sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
+      .renderPass = render_pass,
+      .framebuffer = frame_buffer,
+      .clearValueCount = 1,
+      .pClearValues = &clear_value,
+  };
+
+  vkCmdBeginRenderPass(command_buffer, &vk_render_pass_begin_info,
+                       VK_SUBPASS_CONTENTS_INLINE);
+}
+
 VkCommandPool vlk::create_command_pool(const VkDevice device,
                                        const uint32_t queue_family_index) {
   VkCommandPool command_pool;

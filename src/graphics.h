@@ -17,6 +17,9 @@ private:
   VkSwapchainKHR swapchain;
   std::vector<VkImage> swapchain_images;
 
+  VkRenderPass render_pass;
+  VkFramebuffer framebuffer;
+
   VkCommandPool command_pool;
   VkCommandBuffer command_buffer;
 

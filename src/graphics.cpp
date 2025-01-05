@@ -19,6 +19,9 @@ Graphics::Graphics(const VkInstance instance_, const VkSurfaceKHR surface_) {
       vlk::get_surface_capabilities(physical_device, surface);
   swapchain = vlk::create_swapchain(device, surface, surface_capabilities);
   swapchain_images = vlk::get_swapchain_images(device, swapchain);
+  render_pass = vlk::render_pass::create(device);
+  framebuffer =
+      vlk::create_framebuffer(device, render_pass, surface_capabilities);
 
   command_pool = vlk::create_command_pool(device, queue_family_index);
   command_buffer = vlk::command_buffer::create(device, command_pool);

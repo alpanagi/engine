@@ -27,6 +27,9 @@ void submit_queue(const VkQueue, const VkCommandBuffer);
 void present(const VkQueue, const VkSwapchainKHR,
              const VkSemaphore swapchain_semaphore, const uint32_t image_index);
 
+VkFramebuffer create_framebuffer(const VkDevice, const VkRenderPass,
+                                 const VkSurfaceCapabilitiesKHR);
+
 namespace command_buffer {
 VkCommandBuffer create(const VkDevice, const VkCommandPool);
 void begin(const VkCommandBuffer);
@@ -36,6 +39,13 @@ void end(const VkCommandBuffer);
 namespace semaphore {
 VkSemaphore create(const VkDevice);
 }
+
+namespace render_pass {
+VkRenderPass create(const VkDevice device);
+void begin(const VkCommandBuffer command_buffer, const VkRenderPass,
+           const VkFramebuffer);
+void end(const VkCommandBuffer command_buffer, const VkRenderPass);
+} // namespace render_pass
 } // namespace vlk
 
 #endif
