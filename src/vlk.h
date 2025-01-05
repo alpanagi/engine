@@ -16,11 +16,14 @@ get_surface_capabilities(const VkPhysicalDevice physical_device,
                          const VkSurfaceKHR surface);
 VkSwapchainKHR create_swapchain(const VkDevice, const VkSurfaceKHR,
                                 const VkSurfaceCapabilitiesKHR);
+std::vector<VkImage> get_swapchain_images(const VkDevice, const VkSwapchainKHR);
+uint32_t get_next_swapchain_image(const VkDevice device,
+                                  const VkSwapchainKHR swapchain);
 
 VkCommandPool create_command_pool(const VkDevice,
                                   const uint32_t queue_family_index);
 void submit_queue(const VkQueue, const VkCommandBuffer);
-void present(const VkQueue, const VkSwapchainKHR);
+void present(const VkQueue, const VkSwapchainKHR, const uint32_t image_index);
 
 namespace command_buffer {
 VkCommandBuffer create(const VkDevice, const VkCommandPool);

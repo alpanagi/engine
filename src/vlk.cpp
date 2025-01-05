@@ -122,6 +122,36 @@ vlk::create_swapchain(const VkDevice device, const VkSurfaceKHR surface,
   return swapchain;
 }
 
+std::vector<VkImage> vlk::get_swapchain_images(const VkDevice device,
+                                               const VkSwapchainKHR swapchain) {
+  uint32_t count;
+  if (auto error = vkGetSwapchainImagesKHR(device, swapchain, &count, nullptr);
+      error != VK_SUCCESS) {
+    panik::crash(panik::component::vulkan, string_VkResult(error));
+  }
+
+  std::vector<VkImage> images(count);
+  if (auto error =
+          vkGetSwapchainImagesKHR(device, swapchain, &count, images.data());
+      error != VK_SUCCESS) {
+    panik::crash(panik::component::vulkan, string_VkResult(error));
+  }
+
+  return images;
+}
+
+uint32_t vlk::get_next_swapchain_image(const VkDevice device,
+                                       const VkSwapchainKHR swapchain) {
+  uint32_t image_index;
+  if (auto error = vkAcquireNextImageKHR(device, swapchain, 0, nullptr, nullptr,
+                                         &image_index);
+      error != VK_SUCCESS) {
+    panik::crash(panik::component::vulkan, string_VkResult(error));
+  }
+
+  return image_index;
+}
+
 void vlk::submit_queue(const VkQueue queue,
                        const VkCommandBuffer command_buffer) {
   VkSubmitInfo vk_submit_info{
@@ -136,11 +166,13 @@ void vlk::submit_queue(const VkQueue queue,
   }
 }
 
-void vlk::present(const VkQueue queue, const VkSwapchainKHR swapchain) {
+void vlk::present(const VkQueue queue, const VkSwapchainKHR swapchain,
+                  const uint32_t image_index) {
   VkPresentInfoKHR vk_present_info{
       .sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
       .swapchainCount = 1,
       .pSwapchains = &swapchain,
+      .pImageIndices = &image_index,
   };
 
   if (auto error = vkQueuePresentKHR(queue, &vk_present_info);

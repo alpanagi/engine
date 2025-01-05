@@ -2,6 +2,7 @@
 #define _GRAPHICS_H_
 
 #include "vulkan/vulkan.h"
+#include <vector>
 #include <vulkan/vulkan_core.h>
 
 class Graphics {
@@ -14,6 +15,7 @@ private:
 
   VkSurfaceCapabilitiesKHR surface_capabilities;
   VkSwapchainKHR swapchain;
+  std::vector<VkImage> swapchain_images;
 
   VkCommandPool command_pool;
   VkCommandBuffer command_buffer;
