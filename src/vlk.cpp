@@ -228,14 +228,15 @@ void vlk::present(const VkQueue queue, const VkSwapchainKHR swapchain,
 
 VkFramebuffer
 vlk::create_framebuffer(const VkDevice device, const VkRenderPass render_pass,
-                        const VkSurfaceCapabilitiesKHR surface_capabilities) {
+                        const VkSurfaceCapabilitiesKHR surface_capabilities,
+                        const VkImageView image_view) {
   VkFramebuffer framebuffer;
 
   VkFramebufferCreateInfo vk_framebuffer_create_info{
       .sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO,
       .renderPass = render_pass,
-      .attachmentCount = 0,
-      .pAttachments = nullptr,
+      .attachmentCount = 1,
+      .pAttachments = &image_view,
       .width = surface_capabilities.currentExtent.width,
       .height = surface_capabilities.currentExtent.height,
       .layers = 1,
@@ -384,10 +385,21 @@ VkRenderPass vlk::render_pass::create(const VkDevice device) {
       .pColorAttachments = nullptr,
   };
 
+  VkAttachmentDescription attachment_description{
+      .format = VK_FORMAT_B8G8R8A8_UNORM,
+      .samples = VK_SAMPLE_COUNT_1_BIT,
+      .loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
+      .storeOp = VK_ATTACHMENT_STORE_OP_STORE,
+      .stencilLoadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
+      .stencilStoreOp = VK_ATTACHMENT_STORE_OP_STORE,
+      .initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
+      .finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
+  };
+
   VkRenderPassCreateInfo vk_render_pass_create_info{
       .sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO,
-      .attachmentCount = 0,
-      .pAttachments = nullptr,
+      .attachmentCount = 1,
+      .pAttachments = &attachment_description,
       .subpassCount = 1,
       .pSubpasses = &vk_subpass_description,
   };

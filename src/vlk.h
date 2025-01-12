@@ -32,7 +32,8 @@ void present(const VkQueue, const VkSwapchainKHR,
              const VkSemaphore swapchain_semaphore, const uint32_t image_index);
 
 VkFramebuffer create_framebuffer(const VkDevice, const VkRenderPass,
-                                 const VkSurfaceCapabilitiesKHR);
+                                 const VkSurfaceCapabilitiesKHR,
+                                 const VkImageView);
 VkShaderModule create_shader_module(const VkDevice,
                                     const std::string &filename);
 VkPipelineLayout create_pipeline_layout(const VkDevice);

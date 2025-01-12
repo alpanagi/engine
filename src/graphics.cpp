@@ -25,8 +25,8 @@ Graphics::Graphics(const VkInstance instance_, const VkSurfaceKHR surface_) {
 
   framebuffers = std::vector<VkFramebuffer>(swapchain_image_views.size());
   for (int i = 0; i < swapchain_image_views.size(); i++) {
-    framebuffers[i] =
-        vlk::create_framebuffer(device, render_pass, surface_capabilities);
+    framebuffers[i] = vlk::create_framebuffer(
+        device, render_pass, surface_capabilities, swapchain_image_views[i]);
   }
 
   pipeline = vlk::create_pipeline(device, render_pass, surface_capabilities);
