@@ -17,8 +17,8 @@ Graphics::Graphics(const VkInstance instance_, const VkSurfaceKHR surface_) {
 
   surface_capabilities =
       vlk::get_surface_capabilities(physical_device, surface);
-  swapchain = vlk::create_swapchain(device, surface, surface_capabilities);
-  swapchain_images = vlk::get_swapchain_images(device, swapchain);
+  swapchain = vlk::swapchain::create(device, surface, surface_capabilities);
+  swapchain_images = vlk::swapchain::get_images(device, swapchain);
   render_pass = vlk::render_pass::create(device);
   framebuffer =
       vlk::create_framebuffer(device, render_pass, surface_capabilities);
@@ -32,7 +32,7 @@ Graphics::Graphics(const VkInstance instance_, const VkSurfaceKHR surface_) {
 
 void Graphics::render() {
   auto image_index =
-      vlk::get_next_swapchain_image(device, swapchain, swapchain_semaphore);
+      vlk::swapchain::get_next_image(device, swapchain, swapchain_semaphore);
   vlk::command_buffer::begin(command_buffer);
   vlk::render_pass::begin(command_buffer, render_pass, framebuffer,
                           surface_capabilities);

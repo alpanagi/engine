@@ -14,12 +14,14 @@ std::pair<VkDevice, VkQueue> create_device(const VkPhysicalDevice,
 VkSurfaceCapabilitiesKHR
 get_surface_capabilities(const VkPhysicalDevice physical_device,
                          const VkSurfaceKHR surface);
-VkSwapchainKHR create_swapchain(const VkDevice, const VkSurfaceKHR,
-                                const VkSurfaceCapabilitiesKHR);
-std::vector<VkImage> get_swapchain_images(const VkDevice, const VkSwapchainKHR);
-uint32_t get_next_swapchain_image(const VkDevice device,
-                                  const VkSwapchainKHR swapchain,
-                                  const VkSemaphore semaphore);
+
+namespace swapchain {
+VkSwapchainKHR create(const VkDevice, const VkSurfaceKHR,
+                      const VkSurfaceCapabilitiesKHR);
+std::vector<VkImage> get_images(const VkDevice, const VkSwapchainKHR);
+uint32_t get_next_image(const VkDevice, const VkSwapchainKHR,
+                        const VkSemaphore swapchain_semaphore);
+} // namespace swapchain
 
 VkCommandPool create_command_pool(const VkDevice,
                                   const uint32_t queue_family_index);

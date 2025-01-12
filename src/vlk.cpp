@@ -96,8 +96,8 @@ vlk::get_surface_capabilities(const VkPhysicalDevice physical_device,
 }
 
 VkSwapchainKHR
-vlk::create_swapchain(const VkDevice device, const VkSurfaceKHR surface,
-                      const VkSurfaceCapabilitiesKHR surface_capabilities) {
+vlk::swapchain::create(const VkDevice device, const VkSurfaceKHR surface,
+                       const VkSurfaceCapabilitiesKHR surface_capabilities) {
   VkSwapchainKHR swapchain;
 
   VkSwapchainCreateInfoKHR vk_swapchain_create_info{
@@ -123,8 +123,9 @@ vlk::create_swapchain(const VkDevice device, const VkSurfaceKHR surface,
   return swapchain;
 }
 
-std::vector<VkImage> vlk::get_swapchain_images(const VkDevice device,
-                                               const VkSwapchainKHR swapchain) {
+std::vector<VkImage>
+vlk::swapchain::get_images(const VkDevice device,
+                           const VkSwapchainKHR swapchain) {
   uint32_t count;
   if (auto error = vkGetSwapchainImagesKHR(device, swapchain, &count, nullptr);
       error != VK_SUCCESS) {
@@ -141,9 +142,9 @@ std::vector<VkImage> vlk::get_swapchain_images(const VkDevice device,
   return images;
 }
 
-uint32_t vlk::get_next_swapchain_image(const VkDevice device,
-                                       const VkSwapchainKHR swapchain,
-                                       const VkSemaphore swapchain_semaphore) {
+uint32_t vlk::swapchain::get_next_image(const VkDevice device,
+                                        const VkSwapchainKHR swapchain,
+                                        const VkSemaphore swapchain_semaphore) {
   uint32_t image_index;
   if (auto error = vkAcquireNextImageKHR(
           device, swapchain, 0, swapchain_semaphore, nullptr, &image_index);
