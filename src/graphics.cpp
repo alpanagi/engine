@@ -22,6 +22,7 @@ Graphics::Graphics(const VkInstance instance_, const VkSurfaceKHR surface_) {
   render_pass = vlk::render_pass::create(device);
   framebuffer =
       vlk::create_framebuffer(device, render_pass, surface_capabilities);
+  pipeline = vlk::create_pipeline(device, render_pass, surface_capabilities);
 
   command_pool = vlk::create_command_pool(device, queue_family_index);
   command_buffer = vlk::command_buffer::create(device, command_pool);

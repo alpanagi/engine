@@ -1,4 +1,5 @@
 #include "vlk.h"
+#include "assets.h"
 #include "panik.h"
 #include "vulkan/vk_enum_string_helper.h"
 #include <vulkan/vulkan_core.h>
@@ -207,6 +208,129 @@ vlk::create_framebuffer(const VkDevice device, const VkRenderPass render_pass,
   }
 
   return framebuffer;
+}
+
+VkShaderModule vlk::create_shader_module(const VkDevice device,
+                                         const std::string &filename) {
+  VkShaderModule shader_module;
+
+  auto data = assets::shaders::load(filename);
+
+  VkShaderModuleCreateInfo vk_shader_module_create_info{
+      .sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
+      .codeSize = data.size(),
+      .pCode = reinterpret_cast<const uint32_t *>(data.data()),
+  };
+
+  vkCreateShaderModule(device, &vk_shader_module_create_info, nullptr,
+                       &shader_module);
+
+  return shader_module;
+}
+
+VkPipelineLayout vlk::create_pipeline_layout(const VkDevice device) {
+  VkPipelineLayout pipeline_layout;
+
+  VkPipelineLayoutCreateInfo vk_pipeline_layout_create_info{
+      .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
+  };
+
+  if (auto error = vkCreatePipelineLayout(
+          device, &vk_pipeline_layout_create_info, nullptr, &pipeline_layout);
+      error != VK_SUCCESS) {
+    panik::crash(panik::component::vulkan, string_VkResult(error));
+  }
+
+  return pipeline_layout;
+}
+
+VkPipeline
+vlk::create_pipeline(const VkDevice device, const VkRenderPass render_pass,
+                     const VkSurfaceCapabilitiesKHR surface_capabilities) {
+  VkPipeline graphics_pipeline;
+
+  VkPipelineShaderStageCreateInfo vk_pipeline_fragment_stage_create_info{
+      .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+      .stage = VK_SHADER_STAGE_VERTEX_BIT,
+      .module = vlk::create_shader_module(device, "../shaders/vert.spv"),
+      .pName = "main",
+  };
+
+  VkPipelineShaderStageCreateInfo vk_pipeline_vertex_stage_create_info{
+      .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+      .stage = VK_SHADER_STAGE_FRAGMENT_BIT,
+      .module = vlk::create_shader_module(device, "../shaders/frag.spv"),
+      .pName = "main",
+  };
+
+  VkPipelineShaderStageCreateInfo shader_stages[] = {
+      vk_pipeline_vertex_stage_create_info,
+      vk_pipeline_fragment_stage_create_info,
+  };
+
+  VkPipelineVertexInputStateCreateInfo
+      vk_pipeline_vertex_input_state_create_info{
+          .sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO,
+      };
+
+  VkPipelineInputAssemblyStateCreateInfo
+      vk_pipeline_input_assembly_state_create_info{
+          .sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO,
+          .topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST,
+      };
+
+  VkViewport viewport{.x = 0,
+                      .y = 0,
+                      .width = (float)surface_capabilities.currentExtent.width,
+                      .height =
+                          (float)surface_capabilities.currentExtent.height,
+                      .minDepth = 0.0,
+                      .maxDepth = 1.0};
+
+  VkRect2D scissors{.extent = surface_capabilities.currentExtent};
+
+  VkPipelineViewportStateCreateInfo vk_pipeline_viewport_state_create_info{
+      .sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO,
+      .viewportCount = 1,
+      .pViewports = &viewport,
+      .scissorCount = 1,
+      .pScissors = &scissors,
+  };
+
+  VkPipelineRasterizationStateCreateInfo
+      vk_pipeline_rasterization_state_create_info{
+          .sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO,
+          .polygonMode = VK_POLYGON_MODE_FILL,
+          .cullMode = VK_CULL_MODE_BACK_BIT,
+          .frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE,
+          .lineWidth = 1,
+      };
+
+  VkPipelineMultisampleStateCreateInfo
+      vk_pipeline_multisample_state_create_info{
+          .sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO,
+          .rasterizationSamples = VK_SAMPLE_COUNT_1_BIT,
+      };
+
+  VkGraphicsPipelineCreateInfo vk_graphics_pipeline_create_info{
+      .sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO,
+      .stageCount = 2,
+      .pStages = shader_stages,
+      .pVertexInputState = &vk_pipeline_vertex_input_state_create_info,
+      .pInputAssemblyState = &vk_pipeline_input_assembly_state_create_info,
+      .pViewportState = &vk_pipeline_viewport_state_create_info,
+      .pRasterizationState = &vk_pipeline_rasterization_state_create_info,
+      .pMultisampleState = &vk_pipeline_multisample_state_create_info,
+      .layout = vlk::create_pipeline_layout(device),
+      .renderPass = render_pass,
+      .subpass = 0,
+  };
+
+  vkCreateGraphicsPipelines(device, nullptr, 1,
+                            &vk_graphics_pipeline_create_info, nullptr,
+                            &graphics_pipeline);
+
+  return graphics_pipeline;
 }
 
 VkRenderPass vlk::render_pass::create(const VkDevice device) {

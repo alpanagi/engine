@@ -19,6 +19,7 @@ private:
 
   VkRenderPass render_pass;
   VkFramebuffer framebuffer;
+  VkPipeline pipeline;
 
   VkCommandPool command_pool;
   VkCommandBuffer command_buffer;

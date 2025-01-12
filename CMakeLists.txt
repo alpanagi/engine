@@ -18,4 +18,5 @@ target_sources(engine PRIVATE
   src/vlk.cpp
   src/panik.cpp
   src/graphics.cpp
+  src/assets.cpp
 )

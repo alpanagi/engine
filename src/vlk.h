@@ -29,6 +29,11 @@ void present(const VkQueue, const VkSwapchainKHR,
 
 VkFramebuffer create_framebuffer(const VkDevice, const VkRenderPass,
                                  const VkSurfaceCapabilitiesKHR);
+VkShaderModule create_shader_module(const VkDevice,
+                                    const std::string &filename);
+VkPipelineLayout create_pipeline_layout(const VkDevice);
+VkPipeline create_pipeline(const VkDevice, const VkRenderPass,
+                           const VkSurfaceCapabilitiesKHR);
 
 namespace command_buffer {
 VkCommandBuffer create(const VkDevice, const VkCommandPool);

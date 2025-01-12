@@ -4,6 +4,9 @@
 void panik::crash(panik::component component, const std::string &msg) {
   std::string component_name = "UNKNOWN";
   switch (component) {
+  case component::assets:
+    component_name = "ASSETS";
+    break;
   case component::sdl:
     component_name = "SDL";
     break;
@@ -12,6 +15,6 @@ void panik::crash(panik::component component, const std::string &msg) {
     break;
   }
 
-  std::print("[ERROR][{}] {}", component_name, msg);
+  std::println("[ERROR][{}] {}", component_name, msg);
   exit(1);
 }

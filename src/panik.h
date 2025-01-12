@@ -5,6 +5,7 @@
 
 namespace panik {
 enum class component {
+  assets,
   sdl,
   vulkan,
 };
