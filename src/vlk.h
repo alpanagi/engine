@@ -19,6 +19,8 @@ namespace swapchain {
 VkSwapchainKHR create(const VkDevice, const VkSurfaceKHR,
                       const VkSurfaceCapabilitiesKHR);
 std::vector<VkImage> get_images(const VkDevice, const VkSwapchainKHR);
+std::vector<VkImageView> get_image_views(const VkDevice,
+                                         const std::vector<VkImage> &);
 uint32_t get_next_image(const VkDevice, const VkSwapchainKHR,
                         const VkSemaphore swapchain_semaphore);
 } // namespace swapchain

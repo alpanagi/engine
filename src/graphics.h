@@ -16,9 +16,10 @@ private:
   VkSurfaceCapabilitiesKHR surface_capabilities;
   VkSwapchainKHR swapchain;
   std::vector<VkImage> swapchain_images;
+  std::vector<VkImageView> swapchain_image_views;
+  std::vector<VkFramebuffer> framebuffers;
 
   VkRenderPass render_pass;
-  VkFramebuffer framebuffer;
   VkPipeline pipeline;
 
   VkCommandPool command_pool;

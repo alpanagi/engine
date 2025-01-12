@@ -142,6 +142,45 @@ vlk::swapchain::get_images(const VkDevice device,
   return images;
 }
 
+std::vector<VkImageView>
+vlk::swapchain::get_image_views(const VkDevice device,
+                                const std::vector<VkImage> &images) {
+  std::vector<VkImageView> image_views(images.size());
+
+  VkComponentMapping component_mapping{
+      .r = VK_COMPONENT_SWIZZLE_IDENTITY,
+      .g = VK_COMPONENT_SWIZZLE_IDENTITY,
+      .b = VK_COMPONENT_SWIZZLE_IDENTITY,
+      .a = VK_COMPONENT_SWIZZLE_IDENTITY,
+  };
+
+  VkImageSubresourceRange subresource_range{
+      .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+      .baseMipLevel = 0,
+      .levelCount = 1,
+      .baseArrayLayer = 0,
+      .layerCount = 1,
+  };
+
+  for (int i = 0; i < images.size(); i++) {
+    VkImageViewCreateInfo vk_image_view_create_info{
+        .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
+        .image = images[i],
+        .viewType = VK_IMAGE_VIEW_TYPE_2D,
+        .format = VK_FORMAT_B8G8R8A8_UNORM,
+        .subresourceRange = subresource_range,
+    };
+
+    if (auto error = vkCreateImageView(device, &vk_image_view_create_info,
+                                       nullptr, &image_views[i]);
+        error != VK_SUCCESS) {
+      panik::crash(panik::component::vulkan, string_VkResult(error));
+    }
+  }
+
+  return image_views;
+}
+
 uint32_t vlk::swapchain::get_next_image(const VkDevice device,
                                         const VkSwapchainKHR swapchain,
                                         const VkSemaphore swapchain_semaphore) {
