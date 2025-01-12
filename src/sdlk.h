@@ -11,6 +11,7 @@ void initialize();
 SDL_Window *create_window(const std::string &title);
 VkSurfaceKHR create_surface(SDL_Window *, const VkInstance);
 std::vector<std::string> get_required_vulkan_extensions();
+void run_event_loop();
 } // namespace sdlk
 
 #endif

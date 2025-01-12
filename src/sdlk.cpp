@@ -42,3 +42,15 @@ std::vector<std::string> sdlk::get_required_vulkan_extensions() {
 
   return string_extension_names;
 }
+
+void sdlk::run_event_loop() {
+  bool is_running = true;
+  while (is_running) {
+    SDL_Event event;
+    while (SDL_PollEvent(&event)) {
+      if (event.type == SDL_EVENT_WINDOW_CLOSE_REQUESTED) {
+        is_running = false;
+      }
+    }
+  }
+}

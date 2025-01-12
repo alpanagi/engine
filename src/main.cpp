@@ -15,4 +15,6 @@ int main() {
   auto surface = sdlk::create_surface(window, instance);
   Graphics graphics(instance, surface);
   graphics.render();
+
+  sdlk::run_event_loop();
 }
