@@ -1,2 +1,3 @@
 # engine
-SDL3/Vulkan/ECS Game Engine
+
+3D game engine written in Zig.
