@@ -1,5 +1,11 @@
-const std = @import("std");
+const builtin = @import("builtin");
 const sdl = @import("sdl");
+const std = @import("std");
+
+const WINDOW_GRAPHICS_API = switch (builtin.target.os.tag) {
+    .macos => sdl.SDL_WINDOW_METAL,
+    else => sdl.SDL_WINDOW_VULKAN,
+};
 
 fn sdlPanic() noreturn {
     std.log.debug("{s}", .{sdl.SDL_GetError()});
@@ -18,7 +24,7 @@ pub const Window = struct {
             "engine",
             1280,
             720,
-            sdl.SDL_WINDOW_RESIZABLE | sdl.SDL_WINDOW_VULKAN,
+            sdl.SDL_WINDOW_RESIZABLE | WINDOW_GRAPHICS_API,
         ) orelse sdlPanic();
 
         return Window{
