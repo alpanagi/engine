@@ -2,30 +2,23 @@ const builtin = @import("builtin");
 const sdl = @import("sdl");
 const std = @import("std");
 
-const WINDOW_GRAPHICS_API = switch (builtin.target.os.tag) {
-    .macos => sdl.SDL_WINDOW_METAL,
-    else => sdl.SDL_WINDOW_VULKAN,
-};
-
-fn sdlPanic() noreturn {
-    std.log.debug("{s}", .{sdl.SDL_GetError()});
-    std.process.exit(1);
-}
+const util = @import("util.zig");
 
 pub const Window = struct {
     sdl_window: *sdl.SDL_Window,
 
     pub fn init() Window {
+        if (!sdl.SDL_SetHint(sdl.SDL_HINT_RENDER_DRIVER, "vulkan")) util.sdlPanic();
         if (!sdl.SDL_Init(sdl.SDL_INIT_VIDEO)) {
-            sdlPanic();
+            util.sdlPanic();
         }
 
         const sdl_window: *sdl.SDL_Window = sdl.SDL_CreateWindow(
             "engine",
             1280,
             720,
-            sdl.SDL_WINDOW_RESIZABLE | WINDOW_GRAPHICS_API,
-        ) orelse sdlPanic();
+            sdl.SDL_WINDOW_RESIZABLE,
+        ) orelse util.sdlPanic();
 
         return Window{
             .sdl_window = sdl_window,

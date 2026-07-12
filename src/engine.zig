@@ -1,17 +1,20 @@
 const sdl = @import("sdl");
 const std = @import("std");
 
+const util = @import("util.zig");
+
 const Graphics = @import("graphics.zig").Graphics;
 const Window = @import("window.zig").Window;
 
 pub const Engine = struct {
     window: Window,
     graphics: Graphics,
-    isRunning: bool = true,
 
-    pub fn init() Engine {
+    hasReceivedTerminationRequest: bool = false,
+
+    pub fn init(alloc: std.mem.Allocator) Engine {
         const window = Window.init();
-        const graphics = Graphics.init();
+        const graphics = Graphics.init(alloc, &window);
 
         return Engine{
             .window = window,
@@ -19,19 +22,42 @@ pub const Engine = struct {
         };
     }
 
-    pub fn deinit(self: *Engine) void {
-        self.graphics.deinit();
+    pub fn deinit(self: *Engine, alloc: std.mem.Allocator) void {
+        self.graphics.deinit(alloc);
         self.window.deinit();
     }
 
     pub fn run(self: *Engine) void {
-        while (self.isRunning) {
+        while (!self.hasReceivedTerminationRequest) {
             while (self.window.readEvent()) |event| {
                 switch (event.type) {
-                    sdl.SDL_EVENT_QUIT, sdl.SDL_EVENT_WINDOW_CLOSE_REQUESTED => self.isRunning = false,
+                    sdl.SDL_EVENT_QUIT,
+                    sdl.SDL_EVENT_WINDOW_CLOSE_REQUESTED,
+                    => self.hasReceivedTerminationRequest = true,
                     else => {},
                 }
             }
+
+            self.graphics.draw(&self.window);
         }
+    }
+
+    pub fn createMaterial(
+        self: *Engine,
+        alloc: std.mem.Allocator,
+        io: std.Io,
+        shaderPath: []const u8,
+    ) void {
+        const cwd = std.Io.Dir.cwd();
+        const file = cwd.openFile(io, shaderPath, .{ .mode = .read_only }) catch {
+            util.panic("Failed to open shader file: {s}\n", .{shaderPath});
+        };
+        defer file.close(io);
+
+        var buffer: [8192]u8 = undefined;
+        var reader = file.reader(io, &buffer);
+        self.graphics.createMaterial(alloc, &reader.interface) catch {
+            util.panic("Failed to parse shader: {s}\n", .{shaderPath});
+        };
     }
 };
