@@ -7,10 +7,7 @@ const util = @import("util.zig");
 pub const Material = struct {
     pipeline: *sdl.SDL_GPUGraphicsPipeline,
 
-    pub fn init(
-        device: *sdl.SDL_GPUDevice,
-        reader: *std.Io.Reader,
-    ) (std.mem.Allocator.Error || std.Io.Reader.ShortError)!Material {
+    pub fn init(device: *sdl.SDL_GPUDevice, reader: *std.Io.Reader) !Material {
         var buffer: [1024 * 1024]u8 = undefined;
         const bufferLen = try reader.readSliceShort(&buffer);
         const shaderData = buffer[0..bufferLen];

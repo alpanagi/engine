@@ -65,11 +65,7 @@ pub const Graphics = struct {
         if (!sdl.SDL_SubmitGPUCommandBuffer(commandBuffer)) util.sdlPanic();
     }
 
-    pub fn createMaterial(
-        self: *Graphics,
-        alloc: std.mem.Allocator,
-        reader: *std.Io.Reader,
-    ) (std.mem.Allocator.Error || std.Io.Reader.ShortError)!void {
+    pub fn createMaterial(self: *Graphics, alloc: std.mem.Allocator, reader: *std.Io.Reader) !void {
         const material = try Material.init(self.device, reader);
         try self.materials.append(alloc, material);
     }
