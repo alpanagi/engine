@@ -3,26 +3,32 @@ const std = @import("std");
 
 const util = @import("util.zig");
 
+const AssetManager = @import("assets.zig").AssetManager;
 const Graphics = @import("graphics.zig").Graphics;
 const Window = @import("window.zig").Window;
 
 pub const Engine = struct {
     window: Window,
     graphics: Graphics,
+    asset_manager: AssetManager,
 
     hasReceivedTerminationRequest: bool = false,
 
-    pub fn init(alloc: std.mem.Allocator) Engine {
-        const window = Window.init();
+    pub fn init(alloc: std.mem.Allocator, io: std.Io, working_directory: []const u8) !Engine {
+        const asset_manager = try AssetManager.init(alloc, io, working_directory);
+
+        const window = Window.init(asset_manager.project_data.window_title);
         const graphics = Graphics.init(alloc, &window);
 
         return Engine{
             .window = window,
             .graphics = graphics,
+            .asset_manager = asset_manager,
         };
     }
 
     pub fn deinit(self: *Engine, alloc: std.mem.Allocator) void {
+        self.asset_manager.deinit(alloc);
         self.graphics.deinit(alloc);
         self.window.deinit();
     }

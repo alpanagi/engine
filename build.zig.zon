@@ -3,7 +3,12 @@
     .version = "0.0.0",
     .fingerprint = 0xe8a81a8de801602a,
     .minimum_zig_version = "0.16.0",
-    .dependencies = .{},
+    .dependencies = .{
+        .toml_parser = .{
+            .url = "git+https://github.com/alpanagi/toml#87e9b34ba2bc041724dfb7923ea39cd1e4a83134",
+            .hash = "toml_parser-0.0.0-dex7UTrEAACLCqU-RleGUbiCIvVg2hr9NY3EdZwTnBqG",
+        },
+    },
     .paths = .{
         "build.zig",
         "build.zig.zon",

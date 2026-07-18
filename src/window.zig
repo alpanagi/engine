@@ -7,14 +7,14 @@ const util = @import("util.zig");
 pub const Window = struct {
     sdl_window: *sdl.SDL_Window,
 
-    pub fn init() Window {
+    pub fn init(window_title: []const u8) Window {
         if (!sdl.SDL_SetHint(sdl.SDL_HINT_RENDER_DRIVER, "vulkan")) util.sdlPanic();
         if (!sdl.SDL_Init(sdl.SDL_INIT_VIDEO)) {
             util.sdlPanic();
         }
 
         const sdl_window: *sdl.SDL_Window = sdl.SDL_CreateWindow(
-            "engine",
+            window_title.ptr,
             1280,
             720,
             sdl.SDL_WINDOW_RESIZABLE,
