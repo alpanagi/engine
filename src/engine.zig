@@ -4,6 +4,7 @@ const std = @import("std");
 const util = @import("util.zig");
 
 const AssetManager = @import("assets.zig").AssetManager;
+const Color = @import("color.zig").Color;
 const Graphics = @import("graphics.zig").Graphics;
 const Window = @import("window.zig").Window;
 
@@ -17,7 +18,10 @@ pub const Engine = struct {
     pub fn init(alloc: std.mem.Allocator, io: std.Io, working_directory: []const u8) !Engine {
         const asset_manager = try AssetManager.init(alloc, io, working_directory);
 
-        const window = Window.init(asset_manager.project_data.window_title);
+        const window = Window.init(
+            asset_manager.project_data.window_title,
+            try Color.fromHex(asset_manager.project_data.clear_color),
+        );
         const graphics = Graphics.init(alloc, &window);
 
         return Engine{

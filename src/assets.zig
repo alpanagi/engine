@@ -3,15 +3,18 @@ const toml = @import("toml");
 
 pub const ProjectData = struct {
     window_title: []const u8,
+    clear_color: []const u8,
 
     pub fn default(alloc: std.mem.Allocator) !ProjectData {
         return ProjectData{
             .window_title = try alloc.dupe(u8, "Engine"),
+            .clear_color = try alloc.dupe(u8, "#000000"),
         };
     }
 
     pub fn deinit(self: *ProjectData, alloc: std.mem.Allocator) void {
         alloc.free(self.window_title);
+        alloc.free(self.clear_color);
     }
 };
 

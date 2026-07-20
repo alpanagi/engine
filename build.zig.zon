@@ -5,8 +5,8 @@
     .minimum_zig_version = "0.16.0",
     .dependencies = .{
         .toml = .{
-            .url = "git+https://github.com/alpanagi/toml.git#b7023717cff76a127dd2a90ab6cbbe40ebe240c7",
-            .hash = "toml-0.0.0-yNlRTBfEAADuQpVEyIGA6KQVnbnDApyBSXxo8B67FZKD",
+            .url = "git+https://github.com/alpanagi/toml.git#9f2878a3ebd66325e6cee0fe79a49955837a1cc2",
+            .hash = "toml-0.0.0-yNlRTAfLAAA6uvD2bUA20Tc_LXmjtUvsnByW4hMtkkZV",
         },
     },
     .paths = .{

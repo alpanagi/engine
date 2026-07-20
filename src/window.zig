@@ -4,10 +4,14 @@ const std = @import("std");
 
 const util = @import("util.zig");
 
+const Color = @import("color.zig").Color;
+
 pub const Window = struct {
     sdl_window: *sdl.SDL_Window,
 
-    pub fn init(window_title: []const u8) Window {
+    clear_color: Color,
+
+    pub fn init(window_title: []const u8, clear_color: Color) Window {
         if (!sdl.SDL_SetHint(sdl.SDL_HINT_RENDER_DRIVER, "vulkan")) util.sdlPanic();
         if (!sdl.SDL_Init(sdl.SDL_INIT_VIDEO)) {
             util.sdlPanic();
@@ -22,6 +26,7 @@ pub const Window = struct {
 
         return Window{
             .sdl_window = sdl_window,
+            .clear_color = clear_color,
         };
     }
 

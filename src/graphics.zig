@@ -53,7 +53,12 @@ pub const Graphics = struct {
         if (swapchainTexture) |texture| {
             const colorTargetInfo = sdl.SDL_GPUColorTargetInfo{
                 .texture = texture,
-                .clear_color = sdl.SDL_FColor{ .r = 0.0, .g = 0.0, .b = 0.0, .a = 1.0 },
+                .clear_color = sdl.SDL_FColor{
+                    .r = window.clear_color.r,
+                    .g = window.clear_color.g,
+                    .b = window.clear_color.b,
+                    .a = window.clear_color.a,
+                },
                 .load_op = sdl.SDL_GPU_LOADOP_CLEAR,
                 .store_op = sdl.SDL_GPU_STOREOP_STORE,
                 .cycle = false,
