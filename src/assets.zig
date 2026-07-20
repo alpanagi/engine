@@ -1,5 +1,5 @@
 const std = @import("std");
-const toml_parser = @import("toml_parser");
+const toml = @import("toml");
 
 pub const ProjectData = struct {
     window_title: []const u8,
@@ -49,6 +49,6 @@ pub const AssetManager = struct {
         const text = try cwd.readFileAlloc(io, project_toml_path, alloc, .unlimited);
         defer alloc.free(text);
 
-        return toml_parser.parse(ProjectData, alloc, text);
+        return toml.parse(ProjectData, alloc, text);
     }
 };

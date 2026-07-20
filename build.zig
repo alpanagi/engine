@@ -73,10 +73,10 @@ pub fn build(b: *std.Build) void {
     });
     exe.root_module.addImport("sdl", sdl.module);
     exe.root_module.addImport("sdl_main", sdl_main.module);
-    exe.root_module.addImport("toml_parser", b.dependency("toml_parser", .{
+    exe.root_module.addImport("toml", b.dependency("toml", .{
         .target = target,
         .optimize = optimize,
-    }).module("toml_parser"));
+    }).module("toml"));
     linkCLibraries(exe.root_module, &libs, false);
 
     b.installArtifact(exe);
