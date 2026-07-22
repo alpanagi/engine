@@ -19,8 +19,8 @@ pub const Engine = struct {
         const asset_manager = try AssetManager.init(alloc, io, working_directory);
 
         const window = Window.init(
-            asset_manager.project_data.window_title,
-            try Color.fromHex(asset_manager.project_data.clear_color),
+            asset_manager.project_data.window.title,
+            try Color.fromHex(asset_manager.project_data.window.clear_color),
         );
         const graphics = Graphics.init(alloc, &window);
 
