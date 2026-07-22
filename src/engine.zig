@@ -6,6 +6,7 @@ const util = @import("util.zig");
 const AssetManager = @import("assets.zig").AssetManager;
 const Color = @import("color.zig").Color;
 const Graphics = @import("graphics.zig").Graphics;
+const ProjectConfig = @import("config.zig").ProjectConfig;
 const Window = @import("window.zig").Window;
 
 pub const Engine = struct {
@@ -16,11 +17,13 @@ pub const Engine = struct {
     hasReceivedTerminationRequest: bool = false,
 
     pub fn init(alloc: std.mem.Allocator, io: std.Io, working_directory: []const u8) !Engine {
-        const asset_manager = try AssetManager.init(alloc, io, working_directory);
+        var asset_manager = try AssetManager.init(alloc, working_directory);
+
+        const project_config = try asset_manager.readToml(ProjectConfig, alloc, io, "project.toml");
 
         const window = Window.init(
-            asset_manager.project_data.window.title,
-            try Color.fromHex(asset_manager.project_data.window.clear_color),
+            project_config.window.title,
+            try Color.fromHex(project_config.window.clear_color),
         );
         const graphics = Graphics.init(alloc, &window);
 
