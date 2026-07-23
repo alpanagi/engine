@@ -19,11 +19,15 @@ pub const Engine = struct {
     pub fn init(alloc: std.mem.Allocator, io: std.Io, working_directory: []const u8) !Engine {
         var asset_manager = try AssetManager.init(alloc, working_directory);
 
-        const project_config = try asset_manager.readToml(ProjectConfig, alloc, io, "project.toml");
+        var project_config = try asset_manager.readToml(ProjectConfig, alloc, io, "project.toml");
+        defer project_config.deinit(alloc);
+
+        const icon = asset_manager.loadImage(alloc, project_config.window.icon) catch null;
 
         const window = Window.init(
             project_config.window.title,
             try Color.fromHex(project_config.window.clear_color),
+            icon,
         );
         const graphics = Graphics.init(alloc, &window);
 

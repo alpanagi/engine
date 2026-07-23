@@ -16,6 +16,7 @@ pub const ProjectConfig = struct {
 pub const WindowConfig = struct {
     title: []const u8 = "Engine",
     clear_color: []const u8 = "#000000",
+    icon: []const u8 = "icon.png",
 
     pub fn default(alloc: std.mem.Allocator) !WindowConfig {
         var window: WindowConfig = .{};
@@ -26,11 +27,15 @@ pub const WindowConfig = struct {
         window.clear_color = try alloc.dupe(u8, window.clear_color);
         errdefer alloc.free(window.clear_color);
 
+        window.icon = try alloc.dupe(u8, window.icon);
+        errdefer alloc.free(window.icon);
+
         return window;
     }
 
     pub fn deinit(self: *WindowConfig, alloc: std.mem.Allocator) void {
         alloc.free(self.title);
         alloc.free(self.clear_color);
+        alloc.free(self.icon);
     }
 };

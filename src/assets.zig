@@ -1,5 +1,9 @@
+const sdl = @import("sdl");
+const sdl_image = @import("sdl_image");
 const std = @import("std");
 const toml = @import("toml");
+
+const util = @import("util.zig");
 
 const ProjectConfig = @import("config.zig").ProjectConfig;
 
@@ -21,18 +25,26 @@ pub const AssetManager = struct {
         comptime T: type,
         alloc: std.mem.Allocator,
         io: std.Io,
-        toml_path: []const u8,
+        path: []const u8,
     ) !T {
-        const full_toml_path = try std.fs.path.join(
-            alloc,
-            &.{ self.working_directory, toml_path },
-        );
-        defer alloc.free(full_toml_path);
+        const full_path = try std.fs.path.join(alloc, &.{ self.working_directory, path });
+        defer alloc.free(full_path);
 
         const cwd = std.Io.Dir.cwd();
-        const text = try cwd.readFileAlloc(io, full_toml_path, alloc, .unlimited);
+        const text = try cwd.readFileAlloc(io, full_path, alloc, .unlimited);
         defer alloc.free(text);
 
         return toml.parse(T, alloc, text) catch T.default(alloc);
+    }
+
+    pub fn loadImage(
+        self: *AssetManager,
+        alloc: std.mem.Allocator,
+        path: []const u8,
+    ) !?*sdl.SDL_Surface {
+        const full_path = try std.fs.path.join(alloc, &.{ self.working_directory, path });
+        defer alloc.free(full_path);
+        const image = sdl_image.IMG_Load(full_path.ptr);
+        return @as(?*sdl.SDL_Surface, @ptrCast(image));
     }
 };

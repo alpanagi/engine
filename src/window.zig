@@ -11,7 +11,7 @@ pub const Window = struct {
 
     clear_color: Color,
 
-    pub fn init(window_title: []const u8, clear_color: Color) Window {
+    pub fn init(window_title: []const u8, clear_color: Color, icon: ?*sdl.SDL_Surface) Window {
         if (!sdl.SDL_SetHint(sdl.SDL_HINT_RENDER_DRIVER, "vulkan")) util.sdlPanic();
         if (!sdl.SDL_Init(sdl.SDL_INIT_VIDEO)) {
             util.sdlPanic();
@@ -23,6 +23,10 @@ pub const Window = struct {
             720,
             sdl.SDL_WINDOW_RESIZABLE,
         ) orelse util.sdlPanic();
+
+        if (icon != null) {
+            if (!sdl.SDL_SetWindowIcon(sdl_window, icon)) util.sdlPanic();
+        }
 
         return Window{
             .sdl_window = sdl_window,
