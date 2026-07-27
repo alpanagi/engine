@@ -31,6 +31,12 @@ pub const World = struct {
         try self.entity_manager.deleteEntity(alloc, entity);
     }
 
+    fn hasComponent(self: *World, entity: Entity, comptime T: type) bool {
+        const bitmask = self.entity_manager.getBitmaskForEntity(entity) orelse return false;
+        const index = self.component_registry.getComponentIndex(T) orelse return false;
+        return bitmask & (@as(u64, 1) << @intCast(index)) != 0;
+    }
+
     pub fn addComponent(
         self: *World,
         alloc: std.mem.Allocator,
@@ -41,9 +47,12 @@ pub const World = struct {
         if (!self.entity_manager.isValidEntity(entity)) return;
         try self.component_registry.registerComponent(alloc, T);
 
-        const bitmask = self.entity_manager.getBitmaskForEntity(entity).?;
-        const index = self.component_registry.getComponentIndex(T).?;
-        if (bitmask & (@as(u64, 1) << @intCast(index)) != 0) {
+        if (comptime @sizeOf(T) == 0) {
+            self.entity_manager.enableComponentForEntity(&self.component_registry, entity, T);
+            return;
+        }
+
+        if (self.hasComponent(entity, T)) {
             self.component_storage.removeComponent(&self.component_registry, alloc, entity, T);
         }
 
@@ -52,9 +61,14 @@ pub const World = struct {
     }
 
     pub fn getComponent(self: *World, entity: Entity, comptime T: type) ?*align(1) T {
-        const bitmask = self.entity_manager.getBitmaskForEntity(entity) orelse return null;
-        const index = self.component_registry.getComponentIndex(T) orelse return null;
-        if (bitmask & (@as(u64, 1) << @intCast(index)) == 0) return null;
+        if (!self.hasComponent(entity, T)) return null;
+
+        if (comptime @sizeOf(T) == 0) {
+            const Static = struct {
+                var instance: T = undefined;
+            };
+            return &Static.instance;
+        }
 
         return self.component_storage.getComponent(&self.component_registry, entity, T);
     }
@@ -65,9 +79,12 @@ pub const World = struct {
         entity: Entity,
         comptime T: type,
     ) void {
-        const bitmask = self.entity_manager.getBitmaskForEntity(entity) orelse return;
-        const index = self.component_registry.getComponentIndex(T) orelse return;
-        if (bitmask & (@as(u64, 1) << @intCast(index)) == 0) return;
+        if (!self.hasComponent(entity, T)) return;
+
+        if (comptime @sizeOf(T) == 0) {
+            self.entity_manager.disableComponentForEntity(&self.component_registry, entity, T);
+            return;
+        }
 
         self.component_storage.removeComponent(&self.component_registry, alloc, entity, T);
         self.entity_manager.disableComponentForEntity(&self.component_registry, entity, T);
@@ -202,6 +219,25 @@ test "removeComponent called twice does not double-free" {
     world.removeComponent(std.testing.allocator, entity, Tracked);
 
     try std.testing.expectEqual(1, deinit_calls);
+}
+
+test "addComponent, getComponent, and removeComponent work for a zero-sized tag type" {
+    const IsDead = struct {};
+
+    var world = World.init();
+    defer world.deinit(std.testing.allocator);
+
+    const entity = try world.createEntity(std.testing.allocator);
+
+    try std.testing.expectEqual(null, world.getComponent(entity, IsDead));
+
+    try world.addComponent(std.testing.allocator, entity, IsDead, .{});
+    try std.testing.expect(world.getComponent(entity, IsDead) != null);
+    try std.testing.expectEqual(0b1, world.entity_manager.getBitmaskForEntity(entity));
+
+    world.removeComponent(std.testing.allocator, entity, IsDead);
+    try std.testing.expectEqual(null, world.getComponent(entity, IsDead));
+    try std.testing.expectEqual(0, world.entity_manager.getBitmaskForEntity(entity));
 }
 
 test "deleteEntity invalidates the entity" {
