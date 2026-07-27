@@ -1,8 +1,9 @@
 const std = @import("std");
 const ComponentRegistry = @import("component_registry.zig").ComponentRegistry;
 const ComponentStorage = @import("component_storage.zig").ComponentStorage;
-const EntityManager = @import("entity_manager.zig").EntityManager;
 const Entity = @import("domain.zig").Entity;
+const EntityManager = @import("entity_manager.zig").EntityManager;
+const EntityIterator = @import("entity_manager.zig").EntityIterator;
 
 pub const World = struct {
     component_registry: ComponentRegistry,
@@ -88,6 +89,18 @@ pub const World = struct {
 
         self.component_storage.removeComponent(&self.component_registry, alloc, entity, T);
         self.entity_manager.disableComponentForEntity(&self.component_registry, entity, T);
+    }
+
+    pub fn query(self: *World, comptime types: []const type) EntityIterator {
+        inline for (types) |T| {
+            if (self.component_registry.getComponentIndex(T) == null) {
+                return EntityIterator{ .index = std.math.maxInt(usize) };
+            }
+        }
+
+        return EntityIterator{
+            .bitmask = self.component_registry.calculateBitmask(types),
+        };
     }
 };
 
@@ -238,6 +251,51 @@ test "addComponent, getComponent, and removeComponent work for a zero-sized tag 
     world.removeComponent(std.testing.allocator, entity, IsDead);
     try std.testing.expectEqual(null, world.getComponent(entity, IsDead));
     try std.testing.expectEqual(0, world.entity_manager.getBitmaskForEntity(entity));
+}
+
+test "query yields only entities with every requested component" {
+    const Position = struct { x: f32, y: f32 };
+    const Velocity = struct { dx: f32, dy: f32 };
+
+    var world = World.init();
+    defer world.deinit(std.testing.allocator);
+
+    const a = try world.createEntity(std.testing.allocator);
+    try world.addComponent(std.testing.allocator, a, Position, .{ .x = 1, .y = 2 });
+    try world.addComponent(std.testing.allocator, a, Velocity, .{ .dx = 1, .dy = 1 });
+
+    const b = try world.createEntity(std.testing.allocator);
+    try world.addComponent(std.testing.allocator, b, Position, .{ .x = 3, .y = 4 });
+
+    var q = world.query(&.{ Position, Velocity });
+
+    try std.testing.expectEqual(a, q.next(&world.entity_manager).?);
+    try std.testing.expectEqual(null, q.next(&world.entity_manager));
+}
+
+test "query yields nothing for a type that was never registered" {
+    const Tag = struct { unused: bool = true };
+
+    var world = World.init();
+    defer world.deinit(std.testing.allocator);
+
+    var q = world.query(&.{Tag});
+
+    try std.testing.expectEqual(null, q.next(&world.entity_manager));
+}
+
+test "query for an unregistered type stays empty even if entities are created afterward" {
+    const Tag = struct { unused: bool = true };
+
+    var world = World.init();
+    defer world.deinit(std.testing.allocator);
+
+    var q = world.query(&.{Tag});
+
+    _ = try world.createEntity(std.testing.allocator);
+    _ = try world.createEntity(std.testing.allocator);
+
+    try std.testing.expectEqual(null, q.next(&world.entity_manager));
 }
 
 test "deleteEntity invalidates the entity" {

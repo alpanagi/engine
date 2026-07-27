@@ -84,12 +84,13 @@ pub const EntityManager = struct {
 
 pub const EntityIterator = struct {
     index: usize = 0,
+    bitmask: u64 = 0,
 
     pub fn next(self: *EntityIterator, manager: *EntityManager) ?Entity {
         while (self.index < manager.alive.items.len) {
             const id = self.index;
             self.index += 1;
-            if (manager.alive.items[id]) {
+            if (manager.alive.items[id] and manager.bitmasks.items[id] & self.bitmask == self.bitmask) {
                 return Entity{ .id = id, .generation = manager.generations.items[id] };
             }
         }
@@ -378,6 +379,52 @@ test "iterator returns null immediately when no entities exist" {
     defer manager.deinit(std.testing.allocator);
 
     var it = manager.getEntityIterator();
+    try std.testing.expectEqual(null, it.next(&manager));
+}
+
+test "iterator with a required mask yields only entities whose bitmask satisfies it" {
+    const Position = struct { x: f32, y: f32 };
+    const Velocity = struct { dx: f32, dy: f32 };
+
+    var registry = ComponentRegistry.init();
+    defer registry.deinit(std.testing.allocator);
+    try registry.registerComponent(std.testing.allocator, Position);
+    try registry.registerComponent(std.testing.allocator, Velocity);
+
+    var manager = EntityManager.init();
+    defer manager.deinit(std.testing.allocator);
+
+    const a = try manager.createEntity(std.testing.allocator);
+    manager.enableComponentForEntity(&registry, a, Position);
+    manager.enableComponentForEntity(&registry, a, Velocity);
+
+    const b = try manager.createEntity(std.testing.allocator);
+    manager.enableComponentForEntity(&registry, b, Position);
+
+    var it = manager.getEntityIterator();
+    it.bitmask = registry.calculateBitmask(&.{ Position, Velocity });
+
+    try std.testing.expectEqual(a, it.next(&manager).?);
+    try std.testing.expectEqual(null, it.next(&manager));
+}
+
+test "iterator with a required mask skips a deleted entity even if its old bitmask would have matched" {
+    const Position = struct { x: f32, y: f32 };
+
+    var registry = ComponentRegistry.init();
+    defer registry.deinit(std.testing.allocator);
+    try registry.registerComponent(std.testing.allocator, Position);
+
+    var manager = EntityManager.init();
+    defer manager.deinit(std.testing.allocator);
+
+    const a = try manager.createEntity(std.testing.allocator);
+    manager.enableComponentForEntity(&registry, a, Position);
+    try manager.deleteEntity(std.testing.allocator, a);
+
+    var it = manager.getEntityIterator();
+    it.bitmask = registry.calculateBitmask(&.{Position});
+
     try std.testing.expectEqual(null, it.next(&manager));
 }
 
