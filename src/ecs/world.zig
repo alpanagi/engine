@@ -53,10 +53,6 @@ pub const World = struct {
             return;
         }
 
-        if (self.hasComponent(entity, T)) {
-            self.component_storage.removeComponent(&self.component_registry, alloc, entity, T);
-        }
-
         try self.component_storage.addComponent(&self.component_registry, alloc, entity, T, value);
         self.entity_manager.enableComponentForEntity(&self.component_registry, entity, T);
     }
@@ -176,6 +172,29 @@ test "addComponent over an existing component calls deinit on the old value" {
     const entity = try world.createEntity(std.testing.allocator);
     try world.addComponent(std.testing.allocator, entity, Tracked, .{ .calls = &deinit_calls });
     try world.addComponent(std.testing.allocator, entity, Tracked, .{ .calls = &deinit_calls });
+
+    try std.testing.expectEqual(1, deinit_calls);
+}
+
+test "addComponent to a recycled entity id frees the previous occupant's component" {
+    var deinit_calls: usize = 0;
+    const Tracked = struct {
+        calls: *usize,
+
+        pub fn deinit(self: *@This()) void {
+            self.calls.* += 1;
+        }
+    };
+
+    var world = World.init();
+    defer world.deinit(std.testing.allocator);
+
+    const a = try world.createEntity(std.testing.allocator);
+    try world.addComponent(std.testing.allocator, a, Tracked, .{ .calls = &deinit_calls });
+    try world.deleteEntity(std.testing.allocator, a);
+
+    const b = try world.createEntity(std.testing.allocator);
+    try world.addComponent(std.testing.allocator, b, Tracked, .{ .calls = &deinit_calls });
 
     try std.testing.expectEqual(1, deinit_calls);
 }

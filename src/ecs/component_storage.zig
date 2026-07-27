@@ -26,15 +26,18 @@ pub const ComponentStorage = struct {
 
         const index = component_registry.getComponentIndex(T).?;
         const buffer = &self.buffers[@intCast(index)];
-        const entity_offset = entity.id * @sizeOf(T);
-        const required_buffer_size = entity_offset + @sizeOf(T);
+        const entity_offset = entity.id * @sizeOf(?T);
+        const required_buffer_size = entity_offset + @sizeOf(?T);
 
         if (buffer.items.len < required_buffer_size) {
+            const previous_size = buffer.items.len;
             try buffer.resize(alloc, required_buffer_size);
+            @memset(buffer.items[previous_size..required_buffer_size], 0);
         }
 
-        const dest: *align(1) T = @ptrCast(buffer.items[entity_offset..][0..@sizeOf(T)].ptr);
-        dest.* = value;
+        const slot: *align(1) ?T = @ptrCast(buffer.items[entity_offset..][0..@sizeOf(?T)].ptr);
+        deinitIfPresent(alloc, T, slot.*);
+        slot.* = value;
     }
 
     pub fn getComponent(
@@ -47,9 +50,12 @@ pub const ComponentStorage = struct {
 
         const index = component_registry.getComponentIndex(T) orelse return null;
         const buffer = &self.buffers[@intCast(index)];
-        const entity_offset = entity.id * @sizeOf(T);
-        if (entity_offset + @sizeOf(T) > buffer.items.len) return null;
-        return @ptrCast(buffer.items[entity_offset..][0..@sizeOf(T)].ptr);
+        const entity_offset = entity.id * @sizeOf(?T);
+        if (entity_offset + @sizeOf(?T) > buffer.items.len) return null;
+
+        const slot: *align(1) ?T = @ptrCast(buffer.items[entity_offset..][0..@sizeOf(?T)].ptr);
+        if (slot.* == null) return null;
+        return &slot.*.?;
     }
 
     pub fn removeComponent(
@@ -63,13 +69,19 @@ pub const ComponentStorage = struct {
 
         const index = component_registry.getComponentIndex(T) orelse return;
         const buffer = &self.buffers[@intCast(index)];
-        const entity_offset = entity.id * @sizeOf(T);
-        if (entity_offset + @sizeOf(T) > buffer.items.len) return;
+        const entity_offset = entity.id * @sizeOf(?T);
+        if (entity_offset + @sizeOf(?T) > buffer.items.len) return;
 
+        const slot: *align(1) ?T = @ptrCast(buffer.items[entity_offset..][0..@sizeOf(?T)].ptr);
+        deinitIfPresent(alloc, T, slot.*);
+        slot.* = null;
+    }
+};
+
+fn deinitIfPresent(alloc: std.mem.Allocator, comptime T: type, maybe_value: ?T) void {
+    var copy = maybe_value;
+    if (copy) |*value| {
         if (@hasDecl(T, "deinit")) {
-            var value: T = undefined;
-            @memcpy(std.mem.asBytes(&value), buffer.items[entity_offset..][0..@sizeOf(T)]);
-
             const params = @typeInfo(@TypeOf(T.deinit)).@"fn".params;
             switch (params.len) {
                 1 => value.deinit(),
@@ -78,7 +90,7 @@ pub const ComponentStorage = struct {
             }
         }
     }
-};
+}
 
 test "addComponent then getComponent returns the stored value" {
     const Position = struct { x: f32, y: f32 };
@@ -144,7 +156,7 @@ test "removeComponent is a no-op when the component type was never registered" {
     storage.removeComponent(&registry, std.testing.allocator, entity, Position);
 }
 
-test "removeComponent is a no-op for a type without deinit" {
+test "removeComponent clears the value even for a type without deinit" {
     const Position = struct { x: f32, y: f32 };
 
     var registry = ComponentRegistry.init();
@@ -158,9 +170,7 @@ test "removeComponent is a no-op for a type without deinit" {
     try storage.addComponent(&registry, std.testing.allocator, entity, Position, .{ .x = 1, .y = 2 });
     storage.removeComponent(&registry, std.testing.allocator, entity, Position);
 
-    const got = storage.getComponent(&registry, entity, Position).?;
-    try std.testing.expectEqual(1, got.x);
-    try std.testing.expectEqual(2, got.y);
+    try std.testing.expectEqual(null, storage.getComponent(&registry, entity, Position));
 }
 
 test "removeComponent is a no-op for an entity that never had the component" {
@@ -223,6 +233,30 @@ test "removeComponent calls an allocator-taking deinit and frees its allocation"
     const data = try std.testing.allocator.alloc(u8, 4);
     try storage.addComponent(&registry, std.testing.allocator, entity, Tracked, .{ .data = data });
     storage.removeComponent(&registry, std.testing.allocator, entity, Tracked);
+}
+
+test "addComponent over an existing value calls deinit on the previous one without an explicit remove" {
+    var deinit_calls: usize = 0;
+    const Tracked = struct {
+        calls: *usize,
+
+        pub fn deinit(self: *@This()) void {
+            self.calls.* += 1;
+        }
+    };
+
+    var registry = ComponentRegistry.init();
+    defer registry.deinit(std.testing.allocator);
+    try registry.registerComponent(std.testing.allocator, Tracked);
+
+    var storage = ComponentStorage.init();
+    defer storage.deinit(std.testing.allocator);
+
+    const entity = Entity{ .id = 0, .generation = 0 };
+    try storage.addComponent(&registry, std.testing.allocator, entity, Tracked, .{ .calls = &deinit_calls });
+    try storage.addComponent(&registry, std.testing.allocator, entity, Tracked, .{ .calls = &deinit_calls });
+
+    try std.testing.expectEqual(1, deinit_calls);
 }
 
 test "addComponent after removeComponent stores a fresh value" {
