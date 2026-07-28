@@ -8,7 +8,7 @@ const Color = @import("color.zig").Color;
 const Graphics = @import("graphics.zig").Graphics;
 const ProjectConfig = @import("config.zig").ProjectConfig;
 const Window = @import("window.zig").Window;
-const World = @import("ecs/ecs.zig").World;
+pub const World = @import("ecs/ecs.zig").World;
 
 pub const Engine = struct {
     window: Window,
