@@ -61,10 +61,9 @@ pub const World = struct {
         if (!self.hasComponent(entity, T)) return null;
 
         if (comptime @sizeOf(T) == 0) {
-            const Static = struct {
+            return &(struct {
                 var instance: T = undefined;
-            };
-            return &Static.instance;
+            }).instance;
         }
 
         return self.component_storage.getComponent(&self.component_registry, entity, T);

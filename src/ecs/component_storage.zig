@@ -3,15 +3,21 @@ const std = @import("std");
 const ComponentRegistry = @import("component_registry.zig").ComponentRegistry;
 const Entity = @import("domain.zig").Entity;
 
+const DeinitFunction = *const fn (*std.ArrayList(u8), std.mem.Allocator) void;
+
 pub const ComponentStorage = struct {
     buffers: [64]std.ArrayList(u8) = [_]std.ArrayList(u8){std.ArrayList(u8).empty} ** 64,
+    deinit_functions: [64]?DeinitFunction = [_]?DeinitFunction{null} ** 64,
 
     pub fn init() ComponentStorage {
         return ComponentStorage{};
     }
 
     pub fn deinit(self: *ComponentStorage, alloc: std.mem.Allocator) void {
-        for (&self.buffers) |*buffer| buffer.deinit(alloc);
+        for (&self.buffers, self.deinit_functions) |*buffer, entry| {
+            if (entry) |deinit_function| deinit_function(buffer, alloc);
+            buffer.deinit(alloc);
+        }
     }
 
     pub fn addComponent(
@@ -25,6 +31,7 @@ pub const ComponentStorage = struct {
         if (@sizeOf(T) == 0) @compileError(@typeName(T) ++ " is zero-sized; use EntityManager's bitmask instead of ComponentStorage");
 
         const index = component_registry.getComponentIndex(T).?;
+        self.deinit_functions[@intCast(index)] = getDeinitFunction(T);
         const buffer = &self.buffers[@intCast(index)];
         const entity_offset = entity.id * @sizeOf(?T);
         const required_buffer_size = entity_offset + @sizeOf(?T);
@@ -78,18 +85,30 @@ pub const ComponentStorage = struct {
     }
 };
 
-fn deinitIfPresent(alloc: std.mem.Allocator, comptime T: type, maybe_value: ?T) void {
-    var copy = maybe_value;
-    if (copy) |*value| {
+fn deinitIfPresent(alloc: std.mem.Allocator, comptime T: type, value: ?T) void {
+    var value_copy = value;
+    if (value_copy) |*value_ptr| {
         if (@hasDecl(T, "deinit")) {
             const params = @typeInfo(@TypeOf(T.deinit)).@"fn".params;
             switch (params.len) {
-                1 => value.deinit(),
-                2 => value.deinit(alloc),
+                1 => value_ptr.deinit(),
+                2 => value_ptr.deinit(alloc),
                 else => @compileError(@typeName(T) ++ ".deinit has an unsupported signature"),
             }
         }
     }
+}
+
+fn getDeinitFunction(comptime T: type) DeinitFunction {
+    return struct {
+        fn deinitFunction(buffer: *std.ArrayList(u8), alloc: std.mem.Allocator) void {
+            var offset: usize = 0;
+            while (offset + @sizeOf(?T) <= buffer.items.len) : (offset += @sizeOf(?T)) {
+                const slot: *align(1) ?T = @ptrCast(buffer.items[offset..][0..@sizeOf(?T)].ptr);
+                deinitIfPresent(alloc, T, slot.*);
+            }
+        }
+    }.deinitFunction;
 }
 
 test "addComponent then getComponent returns the stored value" {
@@ -233,6 +252,28 @@ test "removeComponent calls an allocator-taking deinit and frees its allocation"
     const data = try std.testing.allocator.alloc(u8, 4);
     try storage.addComponent(&registry, std.testing.allocator, entity, Tracked, .{ .data = data });
     storage.removeComponent(&registry, std.testing.allocator, entity, Tracked);
+}
+
+test "deinit frees a component's allocation that was never explicitly removed" {
+    const Tracked = struct {
+        data: []u8,
+
+        pub fn deinit(self: *@This(), alloc: std.mem.Allocator) void {
+            alloc.free(self.data);
+        }
+    };
+
+    var registry = ComponentRegistry.init();
+    defer registry.deinit(std.testing.allocator);
+    try registry.registerComponent(std.testing.allocator, Tracked);
+
+    var storage = ComponentStorage.init();
+
+    const entity = Entity{ .id = 0, .generation = 0 };
+    const data = try std.testing.allocator.alloc(u8, 4);
+    try storage.addComponent(&registry, std.testing.allocator, entity, Tracked, .{ .data = data });
+
+    storage.deinit(std.testing.allocator);
 }
 
 test "addComponent over an existing value calls deinit on the previous one without an explicit remove" {
