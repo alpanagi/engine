@@ -343,7 +343,7 @@ test "deleteEntity invalidates the entity" {
 
 test "addSystem then iterateSystems yields the system" {
     const system = struct {
-        fn call(_: *World, _: f32) callconv(.c) void {}
+        fn call(_: *World) callconv(.c) void {}
     }.call;
 
     var world = World.init();
@@ -358,10 +358,10 @@ test "addSystem then iterateSystems yields the system" {
 
 test "addSystem groups systems by the same group name in call order" {
     const a = struct {
-        fn call(_: *World, _: f32) callconv(.c) void {}
+        fn call(_: *World) callconv(.c) void {}
     }.call;
     const b = struct {
-        fn call(_: *World, _: f32) callconv(.c) void {}
+        fn call(_: *World) callconv(.c) void {}
     }.call;
 
     var world = World.init();

@@ -1,7 +1,7 @@
 const std = @import("std");
 const World = @import("world.zig").World;
 
-pub const SystemFunction = *const fn (*World, f32) callconv(.c) void;
+pub const SystemFunction = *const fn (*World) callconv(.c) void;
 
 pub const SystemRegistry = struct {
     groups: std.AutoArrayHashMapUnmanaged(u64, std.ArrayList(SystemFunction)) = .{},
@@ -53,7 +53,7 @@ pub const SystemIterator = struct {
 
 test "registerSystem creates a group on first use" {
     const system = struct {
-        fn call(_: *World, _: f32) callconv(.c) void {}
+        fn call(_: *World) callconv(.c) void {}
     }.call;
 
     var registry = SystemRegistry.init();
@@ -67,10 +67,10 @@ test "registerSystem creates a group on first use" {
 
 test "registerSystem appends to an existing group in call order" {
     const a = struct {
-        fn call(_: *World, _: f32) callconv(.c) void {}
+        fn call(_: *World) callconv(.c) void {}
     }.call;
     const b = struct {
-        fn call(_: *World, _: f32) callconv(.c) void {}
+        fn call(_: *World) callconv(.c) void {}
     }.call;
 
     var registry = SystemRegistry.init();
@@ -87,10 +87,10 @@ test "registerSystem appends to an existing group in call order" {
 
 test "registerSystem preserves group order by first registration" {
     const a = struct {
-        fn call(_: *World, _: f32) callconv(.c) void {}
+        fn call(_: *World) callconv(.c) void {}
     }.call;
     const b = struct {
-        fn call(_: *World, _: f32) callconv(.c) void {}
+        fn call(_: *World) callconv(.c) void {}
     }.call;
 
     var registry = SystemRegistry.init();
@@ -108,13 +108,13 @@ test "registerSystem preserves group order by first registration" {
 
 test "iterator yields systems group by group, in registration order" {
     const a = struct {
-        fn call(_: *World, _: f32) callconv(.c) void {}
+        fn call(_: *World) callconv(.c) void {}
     }.call;
     const b = struct {
-        fn call(_: *World, _: f32) callconv(.c) void {}
+        fn call(_: *World) callconv(.c) void {}
     }.call;
     const c = struct {
-        fn call(_: *World, _: f32) callconv(.c) void {}
+        fn call(_: *World) callconv(.c) void {}
     }.call;
 
     var registry = SystemRegistry.init();
