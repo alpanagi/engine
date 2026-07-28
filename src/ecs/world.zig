@@ -7,12 +7,14 @@ const EntityIterator = @import("entity_manager.zig").EntityIterator;
 const SystemRegistry = @import("system_registry.zig").SystemRegistry;
 const SystemFunction = @import("system_registry.zig").SystemFunction;
 const SystemIterator = @import("system_registry.zig").SystemIterator;
+const PluginRegistry = @import("plugin_registry.zig").PluginRegistry;
 
 pub const World = struct {
     component_registry: ComponentRegistry,
     entity_manager: EntityManager,
     component_storage: ComponentStorage,
     system_registry: SystemRegistry,
+    plugin_registry: PluginRegistry,
 
     pub fn init() World {
         return World{
@@ -20,6 +22,7 @@ pub const World = struct {
             .entity_manager = EntityManager.init(),
             .component_storage = ComponentStorage.init(),
             .system_registry = SystemRegistry.init(),
+            .plugin_registry = PluginRegistry.init(),
         };
     }
 
@@ -28,6 +31,7 @@ pub const World = struct {
         self.entity_manager.deinit(alloc);
         self.component_storage.deinit(alloc);
         self.system_registry.deinit(alloc);
+        self.plugin_registry.deinit(alloc);
     }
 
     pub fn createEntity(self: *World, alloc: std.mem.Allocator) !Entity {
@@ -111,6 +115,10 @@ pub const World = struct {
 
     pub fn iterateSystems(self: *World) SystemIterator {
         return self.system_registry.iterateSystems();
+    }
+
+    pub fn addPlugin(self: *World, alloc: std.mem.Allocator, comptime T: type, value: T) !void {
+        try self.plugin_registry.addPlugin(alloc, self, T, value);
     }
 };
 
@@ -374,4 +382,107 @@ test "addSystem groups systems by the same group name in call order" {
     try std.testing.expectEqual(a, it.next(&world.system_registry).?);
     try std.testing.expectEqual(b, it.next(&world.system_registry).?);
     try std.testing.expectEqual(null, it.next(&world.system_registry));
+}
+
+test "addPlugin runs the plugin's init immediately" {
+    const Plugin = struct {
+        started: *bool,
+
+        pub fn init(self: *@This(), _: std.mem.Allocator, _: *World) !void {
+            self.started.* = true;
+        }
+    };
+
+    var started = false;
+
+    var world = World.init();
+    defer world.deinit(std.testing.allocator);
+
+    try world.addPlugin(std.testing.allocator, Plugin, .{ .started = &started });
+
+    try std.testing.expect(started);
+}
+
+test "a plugin's init can register systems" {
+    const system = struct {
+        fn call(_: *World) callconv(.c) void {}
+    }.call;
+
+    const Plugin = struct {
+        system: SystemFunction,
+
+        pub fn init(self: *@This(), alloc: std.mem.Allocator, world: *World) !void {
+            try world.addSystem(alloc, "update", self.system);
+        }
+    };
+
+    var world = World.init();
+    defer world.deinit(std.testing.allocator);
+
+    try world.addPlugin(std.testing.allocator, Plugin, .{ .system = system });
+
+    var it = world.iterateSystems();
+    try std.testing.expectEqual(system, it.next(&world.system_registry).?);
+    try std.testing.expectEqual(null, it.next(&world.system_registry));
+}
+
+test "deinit calls a plugin's deinit" {
+    const Plugin = struct {
+        calls: *usize,
+
+        pub fn init(_: *@This(), _: std.mem.Allocator, _: *World) !void {}
+
+        pub fn deinit(self: *@This(), _: std.mem.Allocator) void {
+            self.calls.* += 1;
+        }
+    };
+
+    var calls: usize = 0;
+
+    var world = World.init();
+    try world.addPlugin(std.testing.allocator, Plugin, .{ .calls = &calls });
+    world.deinit(std.testing.allocator);
+
+    try std.testing.expectEqual(1, calls);
+}
+
+test "deinit calls a plugin's deinit that takes no allocator" {
+    const Plugin = struct {
+        calls: *usize,
+
+        pub fn init(_: *@This(), _: std.mem.Allocator, _: *World) !void {}
+
+        pub fn deinit(self: *@This()) void {
+            self.calls.* += 1;
+        }
+    };
+
+    var calls: usize = 0;
+
+    var world = World.init();
+    try world.addPlugin(std.testing.allocator, Plugin, .{ .calls = &calls });
+    world.deinit(std.testing.allocator);
+
+    try std.testing.expectEqual(1, calls);
+}
+
+test "deinit tears down every registered plugin" {
+    const Plugin = struct {
+        calls: *usize,
+
+        pub fn init(_: *@This(), _: std.mem.Allocator, _: *World) !void {}
+
+        pub fn deinit(self: *@This(), _: std.mem.Allocator) void {
+            self.calls.* += 1;
+        }
+    };
+
+    var calls: usize = 0;
+
+    var world = World.init();
+    try world.addPlugin(std.testing.allocator, Plugin, .{ .calls = &calls });
+    try world.addPlugin(std.testing.allocator, Plugin, .{ .calls = &calls });
+    world.deinit(std.testing.allocator);
+
+    try std.testing.expectEqual(2, calls);
 }
