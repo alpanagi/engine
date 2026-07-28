@@ -8,11 +8,13 @@ const Color = @import("color.zig").Color;
 const Graphics = @import("graphics.zig").Graphics;
 const ProjectConfig = @import("config.zig").ProjectConfig;
 const Window = @import("window.zig").Window;
+const World = @import("ecs/ecs.zig").World;
 
 pub const Engine = struct {
     window: Window,
     graphics: Graphics,
     asset_manager: AssetManager,
+    world: World,
 
     hasReceivedTerminationRequest: bool = false,
 
@@ -35,10 +37,12 @@ pub const Engine = struct {
             .window = window,
             .graphics = graphics,
             .asset_manager = asset_manager,
+            .world = World.init(),
         };
     }
 
     pub fn deinit(self: *Engine, alloc: std.mem.Allocator) void {
+        self.world.deinit(alloc);
         self.asset_manager.deinit(alloc);
         self.graphics.deinit(alloc);
         self.window.deinit();
@@ -54,6 +58,9 @@ pub const Engine = struct {
                     else => {},
                 }
             }
+
+            var it = self.world.iterateSystems();
+            while (it.next(&self.world.system_registry)) |system| system(&self.world);
 
             self.graphics.draw(&self.window);
         }
