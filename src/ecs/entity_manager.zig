@@ -402,7 +402,7 @@ test "iterator with a required mask yields only entities whose bitmask satisfies
     manager.enableComponentForEntity(&registry, b, Position);
 
     var it = manager.getEntityIterator();
-    it.bitmask = registry.calculateBitmask(&.{ Position, Velocity });
+    it.bitmask = registry.calculateBitmask(&.{ Position, Velocity }).?;
 
     try std.testing.expectEqual(a, it.next(&manager).?);
     try std.testing.expectEqual(null, it.next(&manager));
@@ -423,7 +423,7 @@ test "iterator with a required mask skips a deleted entity even if its old bitma
     try manager.deleteEntity(std.testing.allocator, a);
 
     var it = manager.getEntityIterator();
-    it.bitmask = registry.calculateBitmask(&.{Position});
+    it.bitmask = registry.calculateBitmask(&.{Position}).?;
 
     try std.testing.expectEqual(null, it.next(&manager));
 }

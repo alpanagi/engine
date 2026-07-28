@@ -30,8 +30,10 @@ pub const ComponentStorage = struct {
     ) !void {
         if (@sizeOf(T) == 0) @compileError(@typeName(T) ++ " is zero-sized; use EntityManager's bitmask instead of ComponentStorage");
 
+        try component_registry.registerComponent(alloc, T);
         const index = component_registry.getComponentIndex(T).?;
         self.deinit_functions[@intCast(index)] = getDeinitFunction(T);
+
         const buffer = &self.buffers[@intCast(index)];
         const entity_offset = entity.id * @sizeOf(?T);
         const required_buffer_size = entity_offset + @sizeOf(?T);
@@ -133,6 +135,21 @@ test "addComponent then getComponent returns the stored value" {
     const got = storage.getComponent(&registry, entity, Position).?;
     try std.testing.expectEqual(1, got.x);
     try std.testing.expectEqual(2, got.y);
+}
+
+test "addComponent registers the type when it wasn't registered yet" {
+    const Position = struct { x: f32, y: f32 };
+
+    var registry = ComponentRegistry.init();
+    defer registry.deinit(std.testing.allocator);
+
+    var storage = ComponentStorage.init();
+    defer storage.deinit(std.testing.allocator);
+
+    const entity = Entity{ .id = 0, .generation = 0 };
+    try storage.addComponent(&registry, std.testing.allocator, entity, Position, .{ .x = 1, .y = 2 });
+
+    try std.testing.expectEqual(0, registry.getComponentIndex(Position));
 }
 
 test "getComponent returns null when the component was never added for that entity" {

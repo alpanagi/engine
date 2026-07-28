@@ -46,9 +46,9 @@ pub const World = struct {
         value: T,
     ) !void {
         if (!self.entity_manager.isValidEntity(entity)) return;
-        try self.component_registry.registerComponent(alloc, T);
 
         if (comptime @sizeOf(T) == 0) {
+            try self.component_registry.registerComponent(alloc, T);
             self.entity_manager.enableComponentForEntity(&self.component_registry, entity, T);
             return;
         }
@@ -87,15 +87,10 @@ pub const World = struct {
     }
 
     pub fn query(self: *World, comptime types: []const type) EntityIterator {
-        inline for (types) |T| {
-            if (self.component_registry.getComponentIndex(T) == null) {
-                return EntityIterator{ .index = std.math.maxInt(usize) };
-            }
-        }
-
-        return EntityIterator{
-            .bitmask = self.component_registry.calculateBitmask(types),
+        const bitmask = self.component_registry.calculateBitmask(types) orelse {
+            return EntityIterator{ .index = std.math.maxInt(usize) };
         };
+        return EntityIterator{ .bitmask = bitmask };
     }
 };
 

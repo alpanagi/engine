@@ -27,10 +27,11 @@ pub const ComponentRegistry = struct {
         return self.ids.get(std.hash.Wyhash.hash(0, @typeName(T)));
     }
 
-    pub fn calculateBitmask(self: *ComponentRegistry, comptime types: []const type) u64 {
+    pub fn calculateBitmask(self: *ComponentRegistry, comptime types: []const type) ?u64 {
         var mask: u64 = 0;
         inline for (types) |T| {
-            mask |= @as(u64, 1) << @intCast(self.getComponentIndex(T).?);
+            const index = self.getComponentIndex(T) orelse return null;
+            mask |= @as(u64, 1) << @intCast(index);
         }
         return mask;
     }
@@ -90,5 +91,5 @@ test "calculateBitmask combines bits for the given types" {
 
     const mask = registry.calculateBitmask(&.{ Position, Health });
 
-    try std.testing.expectEqual(0b101, mask);
+    try std.testing.expectEqual(0b101, mask.?);
 }
