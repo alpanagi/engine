@@ -4,17 +4,22 @@ const ComponentStorage = @import("component_storage.zig").ComponentStorage;
 const Entity = @import("domain.zig").Entity;
 const EntityManager = @import("entity_manager.zig").EntityManager;
 const EntityIterator = @import("entity_manager.zig").EntityIterator;
+const SystemRegistry = @import("system_registry.zig").SystemRegistry;
+const SystemFunction = @import("system_registry.zig").SystemFunction;
+const SystemIterator = @import("system_registry.zig").SystemIterator;
 
 pub const World = struct {
     component_registry: ComponentRegistry,
     entity_manager: EntityManager,
     component_storage: ComponentStorage,
+    system_registry: SystemRegistry,
 
     pub fn init() World {
         return World{
             .component_registry = ComponentRegistry.init(),
             .entity_manager = EntityManager.init(),
             .component_storage = ComponentStorage.init(),
+            .system_registry = SystemRegistry.init(),
         };
     }
 
@@ -22,6 +27,7 @@ pub const World = struct {
         self.component_registry.deinit(alloc);
         self.entity_manager.deinit(alloc);
         self.component_storage.deinit(alloc);
+        self.system_registry.deinit(alloc);
     }
 
     pub fn createEntity(self: *World, alloc: std.mem.Allocator) !Entity {
@@ -91,6 +97,20 @@ pub const World = struct {
             return EntityIterator{ .index = std.math.maxInt(usize) };
         };
         return EntityIterator{ .bitmask = bitmask };
+    }
+
+    pub fn addSystem(
+        self: *World,
+        alloc: std.mem.Allocator,
+        group: []const u8,
+        function: SystemFunction,
+    ) !void {
+        const hash = std.hash.Wyhash.hash(0, group);
+        try self.system_registry.registerSystem(alloc, hash, function);
+    }
+
+    pub fn iterateSystems(self: *World) SystemIterator {
+        return self.system_registry.iterateSystems();
     }
 };
 
@@ -319,4 +339,39 @@ test "deleteEntity invalidates the entity" {
     try world.deleteEntity(std.testing.allocator, entity);
 
     try std.testing.expect(!world.entity_manager.isValidEntity(entity));
+}
+
+test "addSystem then iterateSystems yields the system" {
+    const system = struct {
+        fn call(_: *World, _: f32) callconv(.c) void {}
+    }.call;
+
+    var world = World.init();
+    defer world.deinit(std.testing.allocator);
+
+    try world.addSystem(std.testing.allocator, "physics", system);
+
+    var it = world.iterateSystems();
+    try std.testing.expectEqual(system, it.next(&world.system_registry).?);
+    try std.testing.expectEqual(null, it.next(&world.system_registry));
+}
+
+test "addSystem groups systems by the same group name in call order" {
+    const a = struct {
+        fn call(_: *World, _: f32) callconv(.c) void {}
+    }.call;
+    const b = struct {
+        fn call(_: *World, _: f32) callconv(.c) void {}
+    }.call;
+
+    var world = World.init();
+    defer world.deinit(std.testing.allocator);
+
+    try world.addSystem(std.testing.allocator, "physics", a);
+    try world.addSystem(std.testing.allocator, "physics", b);
+
+    var it = world.iterateSystems();
+    try std.testing.expectEqual(a, it.next(&world.system_registry).?);
+    try std.testing.expectEqual(b, it.next(&world.system_registry).?);
+    try std.testing.expectEqual(null, it.next(&world.system_registry));
 }
