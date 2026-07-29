@@ -5,7 +5,7 @@ const World = @import("world.zig").World;
 const DeinitFunction = *const fn (*anyopaque, std.mem.Allocator) void;
 
 const PluginEntry = struct {
-    state: *anyopaque,
+    plugin: *anyopaque,
     deinit: DeinitFunction,
 };
 
@@ -17,7 +17,7 @@ pub const PluginRegistry = struct {
     }
 
     pub fn deinit(self: *PluginRegistry, alloc: std.mem.Allocator) void {
-        for (self.plugins.items) |entry| entry.deinit(entry.state, alloc);
+        for (self.plugins.items) |entry| entry.deinit(entry.plugin, alloc);
         self.plugins.deinit(alloc);
     }
 
@@ -26,19 +26,33 @@ pub const PluginRegistry = struct {
         alloc: std.mem.Allocator,
         world: *World,
         comptime T: type,
-        value: T,
     ) !void {
-        const instance = try alloc.create(T);
-        errdefer alloc.destroy(instance);
+        const plugin = try alloc.create(T);
+        {
+            errdefer alloc.destroy(plugin);
 
-        instance.* = value;
-        try instance.init(alloc, world);
-        errdefer deinitIfPresent(T, instance, alloc);
+            if (@hasDecl(T, "init")) {
+                const params = @typeInfo(@TypeOf(T.init)).@"fn".params;
+                plugin.* = switch (params.len) {
+                    0 => try T.init(),
+                    1 => try T.init(alloc),
+                    else => @compileError(@typeName(T) ++ ".init has an unsupported signature"),
+                };
+            } else {
+                plugin.* = .{};
+            }
+            errdefer deinitIfPresent(T, plugin, alloc);
 
-        try self.plugins.append(alloc, .{
-            .state = instance,
-            .deinit = getDeinitFunction(T),
-        });
+            try self.plugins.append(alloc, .{
+                .plugin = plugin,
+                .deinit = getDeinitFunction(T),
+            });
+        }
+
+        if (!@hasDecl(T, "build")) {
+            @compileError(@typeName(T) ++ " must declare build");
+        }
+        try plugin.build(alloc, world);
     }
 };
 
@@ -63,12 +77,16 @@ fn getDeinitFunction(comptime T: type) DeinitFunction {
 }
 
 test "addPlugin runs the plugin's init immediately and stores it" {
+    const State = struct {
+        var initialized: bool = false;
+    };
     const Plugin = struct {
-        started: *bool,
-
-        pub fn init(self: *@This(), _: std.mem.Allocator, _: *World) !void {
-            self.started.* = true;
+        pub fn init() !@This() {
+            State.initialized = true;
+            return .{};
         }
+
+        pub fn build(_: *@This(), _: std.mem.Allocator, _: *World) !void {}
     };
 
     var world = World.init();
@@ -77,19 +95,26 @@ test "addPlugin runs the plugin's init immediately and stores it" {
     var registry = PluginRegistry.init();
     defer registry.deinit(std.testing.allocator);
 
-    var started = false;
-    try registry.addPlugin(std.testing.allocator, &world, Plugin, .{ .started = &started });
+    try registry.addPlugin(std.testing.allocator, &world, Plugin);
 
-    try std.testing.expect(started);
+    try std.testing.expect(State.initialized);
     try std.testing.expectEqual(1, registry.plugins.items.len);
 }
 
-test "a plugin's init receives the world it was added to" {
+test "a plugin's build receives the initialized plugin and world" {
+    const State = struct {
+        var seen: ?*World = null;
+    };
     const Plugin = struct {
-        seen: **World,
+        initialized: bool,
 
-        pub fn init(self: *@This(), _: std.mem.Allocator, world: *World) !void {
-            self.seen.* = world;
+        pub fn init(_: std.mem.Allocator) !@This() {
+            return .{ .initialized = true };
+        }
+
+        pub fn build(self: *@This(), _: std.mem.Allocator, world: *World) !void {
+            try std.testing.expect(self.initialized);
+            State.seen = world;
         }
     };
 
@@ -99,20 +124,58 @@ test "a plugin's init receives the world it was added to" {
     var registry = PluginRegistry.init();
     defer registry.deinit(std.testing.allocator);
 
-    var seen: *World = undefined;
-    try registry.addPlugin(std.testing.allocator, &world, Plugin, .{ .seen = &seen });
+    try registry.addPlugin(std.testing.allocator, &world, Plugin);
 
-    try std.testing.expectEqual(&world, seen);
+    try std.testing.expectEqual(&world, State.seen.?);
+}
+
+test "a plugin can allocate state in init and free it in deinit" {
+    const Plugin = struct {
+        buffer: []u8,
+
+        pub fn init(alloc: std.mem.Allocator) !@This() {
+            return .{ .buffer = try alloc.alloc(u8, 8) };
+        }
+
+        pub fn build(_: *@This(), _: std.mem.Allocator, _: *World) !void {}
+
+        pub fn deinit(self: *@This(), alloc: std.mem.Allocator) void {
+            alloc.free(self.buffer);
+        }
+    };
+
+    var world = World.init();
+    defer world.deinit(std.testing.allocator);
+
+    var registry = PluginRegistry.init();
+    try registry.addPlugin(std.testing.allocator, &world, Plugin);
+    registry.deinit(std.testing.allocator);
 }
 
 test "deinit calls each plugin's deinit" {
-    const Plugin = struct {
-        calls: *usize,
+    const State = struct {
+        var count: usize = 0;
+    };
+    const PluginA = struct {
+        pub fn init(_: std.mem.Allocator) !@This() {
+            return .{};
+        }
 
-        pub fn init(_: *@This(), _: std.mem.Allocator, _: *World) !void {}
+        pub fn build(_: *@This(), _: std.mem.Allocator, _: *World) !void {}
 
-        pub fn deinit(self: *@This(), _: std.mem.Allocator) void {
-            self.calls.* += 1;
+        pub fn deinit(_: *@This(), _: std.mem.Allocator) void {
+            State.count += 1;
+        }
+    };
+    const PluginB = struct {
+        pub fn init(_: std.mem.Allocator) !@This() {
+            return .{};
+        }
+
+        pub fn build(_: *@This(), _: std.mem.Allocator, _: *World) !void {}
+
+        pub fn deinit(_: *@This(), _: std.mem.Allocator) void {
+            State.count += 1;
         }
     };
 
@@ -121,22 +184,50 @@ test "deinit calls each plugin's deinit" {
 
     var registry = PluginRegistry.init();
 
-    var calls: usize = 0;
-    try registry.addPlugin(std.testing.allocator, &world, Plugin, .{ .calls = &calls });
-    try registry.addPlugin(std.testing.allocator, &world, Plugin, .{ .calls = &calls });
+    try registry.addPlugin(std.testing.allocator, &world, PluginA);
+    try registry.addPlugin(std.testing.allocator, &world, PluginB);
     registry.deinit(std.testing.allocator);
 
-    try std.testing.expectEqual(2, calls);
+    try std.testing.expectEqual(2, State.count);
+}
+
+test "the same plugin type can currently be added more than once" {
+    const State = struct {
+        var init_count: usize = 0;
+    };
+    const Plugin = struct {
+        pub fn init(_: std.mem.Allocator) !@This() {
+            State.init_count += 1;
+            return .{};
+        }
+
+        pub fn build(_: *@This(), _: std.mem.Allocator, _: *World) !void {}
+    };
+
+    var world = World.init();
+    defer world.deinit(std.testing.allocator);
+    var registry = PluginRegistry.init();
+    defer registry.deinit(std.testing.allocator);
+
+    try registry.addPlugin(std.testing.allocator, &world, Plugin);
+    try registry.addPlugin(std.testing.allocator, &world, Plugin);
+    try std.testing.expectEqual(2, State.init_count);
+    try std.testing.expectEqual(2, registry.plugins.items.len);
 }
 
 test "deinit supports a plugin deinit that takes no allocator" {
+    const State = struct {
+        var count: usize = 0;
+    };
     const Plugin = struct {
-        calls: *usize,
+        pub fn init(_: std.mem.Allocator) !@This() {
+            return .{};
+        }
 
-        pub fn init(_: *@This(), _: std.mem.Allocator, _: *World) !void {}
+        pub fn build(_: *@This(), _: std.mem.Allocator, _: *World) !void {}
 
-        pub fn deinit(self: *@This()) void {
-            self.calls.* += 1;
+        pub fn deinit(_: *@This()) void {
+            State.count += 1;
         }
     };
 
@@ -145,16 +236,15 @@ test "deinit supports a plugin deinit that takes no allocator" {
 
     var registry = PluginRegistry.init();
 
-    var calls: usize = 0;
-    try registry.addPlugin(std.testing.allocator, &world, Plugin, .{ .calls = &calls });
+    try registry.addPlugin(std.testing.allocator, &world, Plugin);
     registry.deinit(std.testing.allocator);
 
-    try std.testing.expectEqual(1, calls);
+    try std.testing.expectEqual(1, State.count);
 }
 
 test "a plugin without a deinit is added and freed without error" {
     const Plugin = struct {
-        pub fn init(_: *@This(), _: std.mem.Allocator, _: *World) !void {}
+        pub fn build(_: *@This(), _: std.mem.Allocator, _: *World) !void {}
     };
 
     var world = World.init();
@@ -163,16 +253,18 @@ test "a plugin without a deinit is added and freed without error" {
     var registry = PluginRegistry.init();
     defer registry.deinit(std.testing.allocator);
 
-    try registry.addPlugin(std.testing.allocator, &world, Plugin, .{});
+    try registry.addPlugin(std.testing.allocator, &world, Plugin);
 
     try std.testing.expectEqual(1, registry.plugins.items.len);
 }
 
 test "addPlugin propagates an init error and stores nothing" {
     const Plugin = struct {
-        pub fn init(_: *@This(), _: std.mem.Allocator, _: *World) !void {
+        pub fn init(_: std.mem.Allocator) !@This() {
             return error.Boom;
         }
+
+        pub fn build(_: *@This(), _: std.mem.Allocator, _: *World) !void {}
     };
 
     var world = World.init();
@@ -183,22 +275,25 @@ test "addPlugin propagates an init error and stores nothing" {
 
     try std.testing.expectError(
         error.Boom,
-        registry.addPlugin(std.testing.allocator, &world, Plugin, .{}),
+        registry.addPlugin(std.testing.allocator, &world, Plugin),
     );
 
     try std.testing.expectEqual(0, registry.plugins.items.len);
 }
 
 test "a failed init does not trigger the plugin's deinit" {
+    const State = struct {
+        var deinit_count: usize = 0;
+    };
     const Plugin = struct {
-        deinit_calls: *usize,
-
-        pub fn init(_: *@This(), _: std.mem.Allocator, _: *World) !void {
+        pub fn init(_: std.mem.Allocator) !@This() {
             return error.Boom;
         }
 
-        pub fn deinit(self: *@This(), _: std.mem.Allocator) void {
-            self.deinit_calls.* += 1;
+        pub fn build(_: *@This(), _: std.mem.Allocator, _: *World) !void {}
+
+        pub fn deinit(_: *@This(), _: std.mem.Allocator) void {
+            State.deinit_count += 1;
         }
     };
 
@@ -208,11 +303,33 @@ test "a failed init does not trigger the plugin's deinit" {
     var registry = PluginRegistry.init();
     defer registry.deinit(std.testing.allocator);
 
-    var deinit_calls: usize = 0;
     try std.testing.expectError(
         error.Boom,
-        registry.addPlugin(std.testing.allocator, &world, Plugin, .{ .deinit_calls = &deinit_calls }),
+        registry.addPlugin(std.testing.allocator, &world, Plugin),
     );
 
-    try std.testing.expectEqual(0, deinit_calls);
+    try std.testing.expectEqual(0, State.deinit_count);
+}
+
+test "a plugin remains stored when its build fails" {
+    const Plugin = struct {
+        pub fn init(_: std.mem.Allocator) !@This() {
+            return .{};
+        }
+
+        pub fn build(_: *@This(), _: std.mem.Allocator, _: *World) !void {
+            return error.Boom;
+        }
+    };
+
+    var world = World.init();
+    defer world.deinit(std.testing.allocator);
+    var registry = PluginRegistry.init();
+    defer registry.deinit(std.testing.allocator);
+
+    try std.testing.expectError(
+        error.Boom,
+        registry.addPlugin(std.testing.allocator, &world, Plugin),
+    );
+    try std.testing.expectEqual(1, registry.plugins.items.len);
 }

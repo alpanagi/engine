@@ -5,6 +5,7 @@ pub const EntityIterator = @import("entity_manager.zig").EntityIterator;
 pub const EntityManager = @import("entity_manager.zig").EntityManager;
 pub const SystemRegistry = @import("system_registry.zig").SystemRegistry;
 pub const SystemFunction = @import("system_registry.zig").SystemFunction;
+pub const SystemEntry = @import("system_registry.zig").SystemEntry;
 pub const SystemIterator = @import("system_registry.zig").SystemIterator;
 pub const PluginRegistry = @import("plugin_registry.zig").PluginRegistry;
 pub const World = @import("world.zig").World;

@@ -60,7 +60,7 @@ pub const Engine = struct {
             }
 
             var it = self.world.iterateSystems();
-            while (it.next(&self.world.system_registry)) |system| system(&self.world);
+            while (it.next(&self.world.system_registry)) |system| system.run(&self.world);
 
             self.graphics.draw(&self.window);
         }
