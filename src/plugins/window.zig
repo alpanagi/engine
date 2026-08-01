@@ -15,8 +15,6 @@ pub const WindowPlugin = struct {
     sdl_window: ?*sdl.SDL_Window = null,
     clear_color: Color = Color.fromHex("#000000") catch unreachable,
 
-    hasReceivedTerminationRequest: bool = false,
-
     pub fn build(self: *WindowPlugin, allocator: std.mem.Allocator, world: *ecs.World) !void {
         try world.addOneShotSystem(allocator, setup, self);
         try world.addSystem(allocator, "update", readSDLWindowEvents, self);
@@ -42,15 +40,12 @@ pub const WindowPlugin = struct {
         world: *ecs.World,
     ) void {
         if (self.sdl_window == null) return;
-        if (self.hasReceivedTerminationRequest) return;
 
         while (readSDLEvent()) |event| {
             switch (event.type) {
                 sdl.SDL_EVENT_QUIT,
                 sdl.SDL_EVENT_WINDOW_CLOSE_REQUESTED,
                 => {
-                    self.hasReceivedTerminationRequest = true;
-
                     world.trigger(allocator.*, OnWindowDestroy{});
                     if (self.sdl_window) |window| sdl.SDL_DestroyWindow(window);
                     self.sdl_window = null;
@@ -68,7 +63,6 @@ pub const WindowPlugin = struct {
         world: *ecs.World,
     ) void {
         if (self.sdl_window == null) return;
-        if (self.hasReceivedTerminationRequest) return;
 
         world.trigger(allocator.*, OnWindowUpdate{
             .sdl_window = self.sdl_window.?,
