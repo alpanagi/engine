@@ -5,66 +5,43 @@ const World = @import("ecs").World;
 
 const util = @import("util.zig");
 
-const AssetManager = @import("assets.zig").AssetManager;
-const Color = @import("color.zig").Color;
-const Graphics = @import("graphics.zig").Graphics;
-const ProjectConfig = @import("config.zig").ProjectConfig;
-const Window = @import("window.zig").Window;
+pub const OnShutdown = struct {};
 
 pub const Engine = struct {
-    window: Window,
-    graphics: Graphics,
-    asset_manager: AssetManager,
     world: World,
 
     hasReceivedTerminationRequest: bool = false,
 
-    pub fn init(alloc: std.mem.Allocator, io: std.Io, working_directory: []const u8) !Engine {
-        var asset_manager = try AssetManager.init(alloc, working_directory);
-
-        var project_config = try asset_manager.readToml(ProjectConfig, alloc, io, "project.toml");
-        defer project_config.deinit(alloc);
-
-        const icon = asset_manager.loadImage(alloc, project_config.window.icon) catch null;
-
-        const window = Window.init(
-            project_config.window.title,
-            try Color.fromHex(project_config.window.clear_color),
-            icon,
-        );
-        const graphics = Graphics.init(alloc, &window);
+    pub fn init(_: std.mem.Allocator, _: std.Io, _: []const u8) !Engine {
+        if (!sdl.SDL_SetHint(sdl.SDL_HINT_RENDER_DRIVER, "vulkan")) util.sdlPanic();
+        if (!sdl.SDL_Init(sdl.SDL_INIT_VIDEO)) util.sdlPanic();
 
         return Engine{
-            .window = window,
-            .graphics = graphics,
-            .asset_manager = asset_manager,
             .world = World.init(),
         };
     }
 
     pub fn deinit(self: *Engine, alloc: std.mem.Allocator) void {
         self.world.deinit(alloc);
-        self.asset_manager.deinit(alloc);
-        self.graphics.deinit(alloc);
-        self.window.deinit();
+        sdl.SDL_Quit();
     }
 
-    pub fn run(self: *Engine) void {
+    pub fn run(self: *Engine, allocator: std.mem.Allocator) !void {
+        try self.world.addObserver(allocator, onShutdown, self);
+
         while (!self.hasReceivedTerminationRequest) {
-            while (self.window.readEvent()) |event| {
-                switch (event.type) {
-                    sdl.SDL_EVENT_QUIT,
-                    sdl.SDL_EVENT_WINDOW_CLOSE_REQUESTED,
-                    => self.hasReceivedTerminationRequest = true,
-                    else => {},
-                }
-            }
-
             var it = self.world.iterateSystems();
-            while (it.next(&self.world)) |system| system.run(&self.world);
-
-            self.graphics.draw(&self.window);
+            while (it.next(&self.world)) |system| system.run(allocator, &self.world);
         }
+    }
+
+    fn onShutdown(
+        self: *Engine,
+        _: *const std.mem.Allocator,
+        _: *World,
+        _: *const OnShutdown,
+    ) void {
+        self.hasReceivedTerminationRequest = true;
     }
 
     pub fn createMaterial(
