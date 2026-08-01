@@ -18,6 +18,12 @@ pub const WindowPlugin = struct {
     hasReceivedTerminationRequest: bool = false,
 
     pub fn build(self: *WindowPlugin, allocator: std.mem.Allocator, world: *ecs.World) !void {
+        try world.addOneShotSystem(allocator, setup, self);
+        try world.addSystem(allocator, "update", readSDLWindowEvents, self);
+        try world.addSystem(allocator, "update", update, self);
+    }
+
+    pub fn setup(self: *WindowPlugin, allocator: *const std.mem.Allocator, world: *ecs.World) void {
         const sdl_window: *sdl.SDL_Window = sdl.SDL_CreateWindow(
             "Engine".ptr,
             1280,
@@ -25,17 +31,9 @@ pub const WindowPlugin = struct {
             sdl.SDL_WINDOW_RESIZABLE,
         ) orelse util.sdlPanic();
 
-        // if (icon != null) {
-        //     if (!sdl.SDL_SetWindowIcon(sdl_window, icon)) util.sdlPanic();
-        // }
-
         self.sdl_window = sdl_window;
-        self.clear_color = try Color.fromHex("#00ff00");
 
-        world.trigger(allocator, OnWindowCreate{ .sdl_window = self.sdl_window.? });
-
-        try world.addSystem(allocator, "update", readSDLWindowEvents, self);
-        try world.addSystem(allocator, "update", update, self);
+        world.trigger(allocator.*, OnWindowCreate{ .sdl_window = self.sdl_window.? });
     }
 
     pub fn readSDLWindowEvents(
@@ -43,6 +41,7 @@ pub const WindowPlugin = struct {
         allocator: *const std.mem.Allocator,
         world: *ecs.World,
     ) void {
+        if (self.sdl_window == null) return;
         if (self.hasReceivedTerminationRequest) return;
 
         while (readSDLEvent()) |event| {
@@ -68,6 +67,7 @@ pub const WindowPlugin = struct {
         allocator: *const std.mem.Allocator,
         world: *ecs.World,
     ) void {
+        if (self.sdl_window == null) return;
         if (self.hasReceivedTerminationRequest) return;
 
         world.trigger(allocator.*, OnWindowUpdate{

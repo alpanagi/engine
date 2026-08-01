@@ -30,8 +30,7 @@ pub const Engine = struct {
         try self.world.addObserver(allocator, onShutdown, self);
 
         while (!self.hasReceivedTerminationRequest) {
-            var it = self.world.iterateSystems();
-            while (it.next(&self.world)) |system| system.run(allocator, &self.world);
+            self.world.runSystems(allocator);
         }
     }
 
