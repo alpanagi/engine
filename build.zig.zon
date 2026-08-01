@@ -8,6 +8,10 @@
             .url = "git+https://github.com/alpanagi/toml.git#eadbb305f2670601630c7404887faa6c3b3870a9",
             .hash = "toml-0.0.0-yNlRTDPpAAC7fyA8eKvEQF6X2oud4c355zZbJWKwssyS",
         },
+        .ecs = .{
+            .url = "git+https://github.com/alpanagi/ecs.git#750a517f0cc383b47931e4596cca9cf6eac608d8",
+            .hash = "ecs-0.0.0-3WUiB3vOAQAi0Xlgc2DKlGqPjaX0yf3Q1gPN_O-i-G3f",
+        },
     },
     .paths = .{
         "build.zig",

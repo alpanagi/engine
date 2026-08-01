@@ -1,6 +1,8 @@
 const sdl = @import("sdl");
 const std = @import("std");
 
+const World = @import("ecs").World;
+
 const util = @import("util.zig");
 
 const AssetManager = @import("assets.zig").AssetManager;
@@ -8,7 +10,6 @@ const Color = @import("color.zig").Color;
 const Graphics = @import("graphics.zig").Graphics;
 const ProjectConfig = @import("config.zig").ProjectConfig;
 const Window = @import("window.zig").Window;
-pub const World = @import("ecs/ecs.zig").World;
 
 pub const Engine = struct {
     window: Window,
@@ -60,7 +61,7 @@ pub const Engine = struct {
             }
 
             var it = self.world.iterateSystems();
-            while (it.next(&self.world.system_registry)) |system| system.run(&self.world);
+            while (it.next(&self.world)) |system| system.run(&self.world);
 
             self.graphics.draw(&self.window);
         }

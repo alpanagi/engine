@@ -40,6 +40,10 @@ pub fn build(b: *std.Build) void {
         .target = target,
         .optimize = optimize,
     }).module("toml"));
+    exe.root_module.addImport("ecs", b.dependency("ecs", .{
+        .target = target,
+        .optimize = optimize,
+    }).module("ecs"));
 
     b.installArtifact(exe);
 }
