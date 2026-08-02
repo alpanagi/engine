@@ -3,8 +3,20 @@ const std = @import("std");
 
 const util = @import("util.zig");
 
-const AssetLoader = @import("resources/asset_loader.zig").AssetLoader;
-const Timer = @import("resources/timer.zig").Timer;
+pub const plugins = struct {
+    pub const GraphicsPlugin = @import("plugins/graphics.zig").GraphicsPlugin;
+    pub const ModuleLoaderPlugin = @import("plugins/module_loader.zig").ModuleLoaderPlugin;
+    pub const TimerPlugin = @import("plugins/timer.zig").TimerPlugin;
+    pub const WindowPlugin = @import("plugins/window.zig").WindowPlugin;
+};
+
+pub const resources = struct {
+    pub const AssetLoader = @import("resources/asset_loader.zig").AssetLoader;
+    pub const Timer = @import("resources/timer.zig").Timer;
+};
+
+const AssetLoader = resources.AssetLoader;
+const Timer = resources.Timer;
 const World = @import("ecs").World;
 
 pub const OnShutdown = struct {};

@@ -25,6 +25,34 @@ pub fn build(b: *std.Build) void {
     const sdl_main = addSystemLibrary(b, target, optimize, "c/sdl_main.h", "SDL3");
     const sdl_image = addSystemLibrary(b, target, optimize, "c/sdl_image.h", "SDL3_image");
 
+    const toml = b.dependency("toml", .{
+        .target = target,
+        .optimize = optimize,
+    }).module("toml");
+    const ecs = b.dependency("ecs", .{
+        .target = target,
+        .optimize = optimize,
+    }).module("ecs");
+
+    const engine_lib = b.addModule("engine", .{
+        .root_source_file = b.path("src/lib.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+
+    const engine_internal = b.createModule(.{
+        .root_source_file = b.path("src/engine.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+
+    for ([_]*std.Build.Module{ engine_lib, engine_internal }) |module| {
+        module.addImport("sdl", sdl);
+        module.addImport("sdl_image", sdl_image);
+        module.addImport("toml", toml);
+        module.addImport("ecs", ecs);
+    }
+
     const exe = b.addExecutable(.{
         .name = "engine",
         .root_module = b.createModule(.{
@@ -33,17 +61,8 @@ pub fn build(b: *std.Build) void {
             .optimize = optimize,
         }),
     });
-    exe.root_module.addImport("sdl", sdl);
     exe.root_module.addImport("sdl_main", sdl_main);
-    exe.root_module.addImport("sdl_image", sdl_image);
-    exe.root_module.addImport("toml", b.dependency("toml", .{
-        .target = target,
-        .optimize = optimize,
-    }).module("toml"));
-    exe.root_module.addImport("ecs", b.dependency("ecs", .{
-        .target = target,
-        .optimize = optimize,
-    }).module("ecs"));
+    exe.root_module.addImport("engine", engine_internal);
 
     b.installArtifact(exe);
 }

@@ -1,11 +1,11 @@
 const _ = @import("sdl_main");
 const std = @import("std");
 
-const Engine = @import("engine.zig").Engine;
-const GraphicsPlugin = @import("plugins/graphics.zig").GraphicsPlugin;
-const ModuleLoaderPlugin = @import("plugins/module_loader.zig").ModuleLoaderPlugin;
-const TimerPlugin = @import("plugins/timer.zig").TimerPlugin;
-const WindowPlugin = @import("plugins/window.zig").WindowPlugin;
+const Engine = @import("engine").Engine;
+const GraphicsPlugin = @import("engine").plugins.GraphicsPlugin;
+const ModuleLoaderPlugin = @import("engine").plugins.ModuleLoaderPlugin;
+const TimerPlugin = @import("engine").plugins.TimerPlugin;
+const WindowPlugin = @import("engine").plugins.WindowPlugin;
 
 pub fn main(init: std.process.Init) !void {
     const allocator = init.gpa;
