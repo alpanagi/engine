@@ -9,8 +9,8 @@
             .hash = "toml-0.0.0-yNlRTDPpAAC7fyA8eKvEQF6X2oud4c355zZbJWKwssyS",
         },
         .ecs = .{
-            .url = "git+https://github.com/alpanagi/ecs.git#474928f199b77f497eb28d455a11df98b670bd87",
-            .hash = "ecs-0.0.0-3WUiB3zkAQCGXsmc5yg3VIvclaQjMj6TV-twLtMp7WRj",
+            .url = "git+https://github.com/alpanagi/ecs.git#fd1628ba0d6e2d46bb005f25b49c2cd263f19c9d",
+            .hash = "ecs-0.0.0-3WUiB5kLAgCaPCEFIVEOgAk4W_DXzQBtUcOGNsKAoF6j",
         },
     },
     .paths = .{

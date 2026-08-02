@@ -1,9 +1,10 @@
 const sdl = @import("sdl");
 const std = @import("std");
 
-const World = @import("ecs").World;
-
 const util = @import("util.zig");
+
+const AssetLoader = @import("resources/asset_loader.zig").AssetLoader;
+const World = @import("ecs").World;
 
 pub const OnShutdown = struct {};
 
@@ -12,12 +13,15 @@ pub const Engine = struct {
 
     hasReceivedTerminationRequest: bool = false,
 
-    pub fn init(_: std.mem.Allocator, _: std.Io, _: []const u8) !Engine {
+    pub fn init(alloc: std.mem.Allocator, _: std.Io, working_directory: []const u8) !Engine {
         if (!sdl.SDL_SetHint(sdl.SDL_HINT_RENDER_DRIVER, "vulkan")) util.sdlPanic();
         if (!sdl.SDL_Init(sdl.SDL_INIT_VIDEO)) util.sdlPanic();
 
+        var world = World.init();
+        try world.addResource(alloc, AssetLoader, try AssetLoader.init(alloc, working_directory));
+
         return Engine{
-            .world = World.init(),
+            .world = world,
         };
     }
 

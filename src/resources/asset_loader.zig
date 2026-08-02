@@ -3,25 +3,21 @@ const sdl_image = @import("sdl_image");
 const std = @import("std");
 const toml = @import("toml");
 
-const util = @import("util.zig");
-
-const ProjectConfig = @import("config.zig").ProjectConfig;
-
-pub const AssetManager = struct {
+pub const AssetLoader = struct {
     working_directory: []const u8,
 
-    pub fn init(alloc: std.mem.Allocator, working_directory: []const u8) !AssetManager {
-        return AssetManager{
+    pub fn init(alloc: std.mem.Allocator, working_directory: []const u8) !AssetLoader {
+        return AssetLoader{
             .working_directory = try alloc.dupe(u8, working_directory),
         };
     }
 
-    pub fn deinit(self: *AssetManager, alloc: std.mem.Allocator) void {
+    pub fn deinit(self: *AssetLoader, alloc: std.mem.Allocator) void {
         alloc.free(self.working_directory);
     }
 
     pub fn readToml(
-        self: *AssetManager,
+        self: *AssetLoader,
         comptime T: type,
         alloc: std.mem.Allocator,
         io: std.Io,
@@ -38,7 +34,7 @@ pub const AssetManager = struct {
     }
 
     pub fn loadImage(
-        self: *AssetManager,
+        self: *AssetLoader,
         alloc: std.mem.Allocator,
         path: []const u8,
     ) !?*sdl.SDL_Surface {
