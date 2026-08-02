@@ -15,10 +15,14 @@ pub const WindowPlugin = struct {
     sdl_window: ?*sdl.SDL_Window = null,
     clear_color: Color = Color.fromHex("#000000") catch unreachable,
 
-    pub fn build(self: *WindowPlugin, allocator: std.mem.Allocator, world: *ecs.World) !void {
-        try world.addOneShotSystem(allocator, setup, self);
-        try world.addSystem(allocator, "update", readSDLWindowEvents, self);
-        try world.addSystem(allocator, "update", update, self);
+    pub fn build(
+        self: *WindowPlugin,
+        allocator: *const std.mem.Allocator,
+        world: *ecs.World,
+    ) !void {
+        try world.addOneShotSystem(allocator.*, setup, self);
+        try world.addSystem(allocator.*, "update", readSDLWindowEvents, self);
+        try world.addSystem(allocator.*, "update", update, self);
     }
 
     pub fn setup(self: *WindowPlugin, allocator: *const std.mem.Allocator, world: *ecs.World) void {

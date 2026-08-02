@@ -12,13 +12,17 @@ pub const ModuleLoaderError = error{
 };
 
 pub const ModuleLoaderPlugin = struct {
-    pub fn build(_: *ModuleLoaderPlugin, allocator: std.mem.Allocator, world: *ecs.World) !void {
+    pub fn build(
+        _: *ModuleLoaderPlugin,
+        allocator: *const std.mem.Allocator,
+        world: *ecs.World,
+    ) !void {
         const asset_loader = world.getResource(AssetLoader) orelse {
             return ModuleLoaderError.MissingAssetLoaderResource;
         };
 
         const modules_path = try std.fs.path.join(
-            allocator,
+            allocator.*,
             &.{ asset_loader.working_directory, "assets", "modules" },
         );
         defer allocator.free(modules_path);
@@ -36,12 +40,12 @@ pub const ModuleLoaderPlugin = struct {
             if (!std.mem.endsWith(u8, entry.name, ".so")) continue;
 
             const module_path = std.fs.path.join(
-                allocator,
+                allocator.*,
                 &.{ modules_path, entry.name },
             ) catch continue;
             defer allocator.free(module_path);
 
-            loadModule(allocator, world, module_path) catch continue;
+            loadModule(allocator.*, world, module_path) catch continue;
         }
     }
 };

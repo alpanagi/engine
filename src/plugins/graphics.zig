@@ -20,10 +20,14 @@ pub const GraphicsPlugin = struct {
         self.materials.deinit(alloc);
     }
 
-    pub fn build(self: *GraphicsPlugin, allocator: std.mem.Allocator, world: *ecs.World) !void {
-        try world.addObserver(allocator, onWindowCreate, self);
-        try world.addObserver(allocator, onWindowDestroy, self);
-        try world.addObserver(allocator, onWindowUpdate, self);
+    pub fn build(
+        self: *GraphicsPlugin,
+        allocator: *const std.mem.Allocator,
+        world: *ecs.World,
+    ) !void {
+        try world.addObserver(allocator.*, onWindowCreate, self);
+        try world.addObserver(allocator.*, onWindowDestroy, self);
+        try world.addObserver(allocator.*, onWindowUpdate, self);
     }
 
     pub fn onWindowCreate(
