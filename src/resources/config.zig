@@ -1,14 +1,14 @@
 const std = @import("std");
 
-pub const ProjectConfig = struct {
+pub const Config = struct {
     window: WindowConfig = .{},
 
-    pub fn default(alloc: std.mem.Allocator) !ProjectConfig {
+    pub fn default(alloc: std.mem.Allocator) !Config {
         const window = try WindowConfig.default(alloc);
         return .{ .window = window };
     }
 
-    pub fn deinit(self: *ProjectConfig, alloc: std.mem.Allocator) void {
+    pub fn deinit(self: *Config, alloc: std.mem.Allocator) void {
         self.window.deinit(alloc);
     }
 };

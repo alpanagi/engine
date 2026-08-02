@@ -4,6 +4,7 @@ const std = @import("std");
 const util = @import("util.zig");
 
 pub const plugins = struct {
+    pub const ConfigPlugin = @import("plugins/config.zig").ConfigPlugin;
     pub const GraphicsPlugin = @import("plugins/graphics.zig").GraphicsPlugin;
     pub const ModuleLoaderPlugin = @import("plugins/module_loader.zig").ModuleLoaderPlugin;
     pub const TimePlugin = @import("plugins/time.zig").TimePlugin;
@@ -12,6 +13,7 @@ pub const plugins = struct {
 
 pub const resources = struct {
     pub const AssetLoader = @import("resources/asset_loader.zig").AssetLoader;
+    pub const Config = @import("resources/config.zig").Config;
     pub const Time = @import("resources/time.zig").Time;
 };
 

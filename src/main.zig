@@ -1,6 +1,7 @@
 const _ = @import("sdl_main");
 const std = @import("std");
 
+const ConfigPlugin = @import("engine").plugins.ConfigPlugin;
 const Engine = @import("engine").Engine;
 const GraphicsPlugin = @import("engine").plugins.GraphicsPlugin;
 const ModuleLoaderPlugin = @import("engine").plugins.ModuleLoaderPlugin;
@@ -20,6 +21,7 @@ pub fn main(init: std.process.Init) !void {
     defer engine.deinit(allocator);
 
     try engine.world.addPlugin(allocator, TimePlugin);
+    try engine.world.addPlugin(allocator, ConfigPlugin);
     try engine.world.addPlugin(allocator, GraphicsPlugin);
     try engine.world.addPlugin(allocator, WindowPlugin);
     try engine.world.addPlugin(allocator, ModuleLoaderPlugin);

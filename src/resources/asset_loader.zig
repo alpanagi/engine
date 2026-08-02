@@ -39,7 +39,7 @@ pub const AssetLoader = struct {
         alloc: std.mem.Allocator,
         path: []const u8,
     ) !?*sdl.SDL_Surface {
-        const full_path = try std.fs.path.join(alloc, &.{ self.working_directory, path });
+        const full_path = try std.fs.path.joinZ(alloc, &.{ self.working_directory, path });
         defer alloc.free(full_path);
         const image = sdl_image.IMG_Load(full_path.ptr);
         return @as(?*sdl.SDL_Surface, @ptrCast(image));
