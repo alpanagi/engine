@@ -13,12 +13,16 @@ pub const Engine = struct {
 
     hasReceivedTerminationRequest: bool = false,
 
-    pub fn init(alloc: std.mem.Allocator, _: std.Io, working_directory: []const u8) !Engine {
+    pub fn init(alloc: std.mem.Allocator, io: std.Io, working_directory: []const u8) !Engine {
         if (!sdl.SDL_SetHint(sdl.SDL_HINT_RENDER_DRIVER, "vulkan")) util.sdlPanic();
         if (!sdl.SDL_Init(sdl.SDL_INIT_VIDEO)) util.sdlPanic();
 
         var world = World.init();
-        try world.addResource(alloc, AssetLoader, try AssetLoader.init(alloc, working_directory));
+        try world.addResource(
+            alloc,
+            AssetLoader,
+            try AssetLoader.init(alloc, io, working_directory),
+        );
 
         return Engine{
             .world = world,
