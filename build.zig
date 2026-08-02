@@ -48,7 +48,12 @@ pub fn build(b: *std.Build) void {
     b.installArtifact(exe);
 }
 
-pub fn buildModules(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.builtin.OptimizeMode) void {
+pub fn buildModules(
+    b: *std.Build,
+    target: std.Build.ResolvedTarget,
+    optimize: std.builtin.OptimizeMode,
+    imports: []const std.Build.Module.Import,
+) void {
     const io = b.graph.io;
 
     var dir = b.build_root.handle.openDir(io, "src/modules", .{ .iterate = true }) catch return;
@@ -69,6 +74,7 @@ pub fn buildModules(b: *std.Build, target: std.Build.ResolvedTarget, optimize: s
                 .root_source_file = b.path(source_path),
                 .target = target,
                 .optimize = optimize,
+                .imports = imports,
             }),
         });
 
