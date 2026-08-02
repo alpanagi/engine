@@ -1,11 +1,11 @@
 const ecs = @import("ecs");
 const std = @import("std");
 
-const Timer = @import("../resources/timer.zig").Timer;
+const Time = @import("../resources/time.zig").Time;
 
-pub const TimerPlugin = struct {
+pub const TimePlugin = struct {
     pub fn build(
-        self: *TimerPlugin,
+        self: *TimePlugin,
         allocator: *const std.mem.Allocator,
         world: *ecs.World,
     ) !void {
@@ -13,10 +13,10 @@ pub const TimerPlugin = struct {
     }
 
     pub fn tick(
-        _: *TimerPlugin,
+        _: *TimePlugin,
         _: *const std.mem.Allocator,
         world: *ecs.World,
     ) void {
-        if (world.getResource(Timer)) |timer| timer.tick();
+        if (world.getResource(Time)) |time| time.tick();
     }
 };

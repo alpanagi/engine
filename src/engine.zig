@@ -6,17 +6,17 @@ const util = @import("util.zig");
 pub const plugins = struct {
     pub const GraphicsPlugin = @import("plugins/graphics.zig").GraphicsPlugin;
     pub const ModuleLoaderPlugin = @import("plugins/module_loader.zig").ModuleLoaderPlugin;
-    pub const TimerPlugin = @import("plugins/timer.zig").TimerPlugin;
+    pub const TimePlugin = @import("plugins/time.zig").TimePlugin;
     pub const WindowPlugin = @import("plugins/window.zig").WindowPlugin;
 };
 
 pub const resources = struct {
     pub const AssetLoader = @import("resources/asset_loader.zig").AssetLoader;
-    pub const Timer = @import("resources/timer.zig").Timer;
+    pub const Time = @import("resources/time.zig").Time;
 };
 
 const AssetLoader = resources.AssetLoader;
-const Timer = resources.Timer;
+const Time = resources.Time;
 const World = @import("ecs").World;
 
 pub const OnShutdown = struct {};
@@ -36,7 +36,7 @@ pub const Engine = struct {
             AssetLoader,
             try AssetLoader.init(alloc, io, working_directory),
         );
-        try world.addResource(alloc, Timer, Timer.init(io));
+        try world.addResource(alloc, Time, Time.init(io));
 
         return Engine{
             .world = world,
