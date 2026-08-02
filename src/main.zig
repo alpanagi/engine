@@ -4,6 +4,7 @@ const std = @import("std");
 const Engine = @import("engine.zig").Engine;
 const GraphicsPlugin = @import("plugins/graphics.zig").GraphicsPlugin;
 const ModuleLoaderPlugin = @import("plugins/module_loader.zig").ModuleLoaderPlugin;
+const TimerPlugin = @import("plugins/timer.zig").TimerPlugin;
 const WindowPlugin = @import("plugins/window.zig").WindowPlugin;
 
 pub fn main(init: std.process.Init) !void {
@@ -18,6 +19,7 @@ pub fn main(init: std.process.Init) !void {
     var engine = try Engine.init(allocator, init.io, working_directory);
     defer engine.deinit(allocator);
 
+    try engine.world.addPlugin(allocator, TimerPlugin);
     try engine.world.addPlugin(allocator, GraphicsPlugin);
     try engine.world.addPlugin(allocator, WindowPlugin);
     try engine.world.addPlugin(allocator, ModuleLoaderPlugin);

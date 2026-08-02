@@ -4,6 +4,7 @@ const std = @import("std");
 const util = @import("util.zig");
 
 const AssetLoader = @import("resources/asset_loader.zig").AssetLoader;
+const Timer = @import("resources/timer.zig").Timer;
 const World = @import("ecs").World;
 
 pub const OnShutdown = struct {};
@@ -23,6 +24,7 @@ pub const Engine = struct {
             AssetLoader,
             try AssetLoader.init(alloc, io, working_directory),
         );
+        try world.addResource(alloc, Timer, Timer.init(io));
 
         return Engine{
             .world = world,
