@@ -19,7 +19,7 @@ pub const ModuleLoaderPlugin = struct {
 
         const modules_path = try std.fs.path.join(
             allocator,
-            &.{ asset_loader.working_directory, "modules" },
+            &.{ asset_loader.working_directory, "assets", "modules" },
         );
         defer allocator.free(modules_path);
 

@@ -47,3 +47,34 @@ pub fn build(b: *std.Build) void {
 
     b.installArtifact(exe);
 }
+
+pub fn buildModules(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.builtin.OptimizeMode) void {
+    const io = b.graph.io;
+
+    var dir = b.build_root.handle.openDir(io, "src/modules", .{ .iterate = true }) catch return;
+    defer dir.close(io);
+
+    var it = dir.iterate();
+    while (it.next(io) catch null) |entry| {
+        if (entry.kind != .file) continue;
+        if (!std.mem.endsWith(u8, entry.name, ".zig")) continue;
+
+        const name = entry.name[0 .. entry.name.len - ".zig".len];
+        const source_path = std.fmt.allocPrint(b.allocator, "src/modules/{s}", .{entry.name}) catch @panic("OOM");
+
+        const module = b.addLibrary(.{
+            .linkage = .dynamic,
+            .name = name,
+            .root_module = b.createModule(.{
+                .root_source_file = b.path(source_path),
+                .target = target,
+                .optimize = optimize,
+            }),
+        });
+
+        const install = b.addInstallArtifact(module, .{
+            .dest_dir = .{ .override = .{ .custom = "../assets/modules" } },
+        });
+        b.getInstallStep().dependOn(&install.step);
+    }
+}
