@@ -14,6 +14,52 @@ pub const OnWindowCreate = struct { sdl_window: *sdl.SDL_Window };
 pub const OnWindowDestroy = struct {};
 pub const OnWindowUpdate = struct { sdl_window: *sdl.SDL_Window, clear_color: Color };
 
+pub const Window = struct {
+    sdl_window: *sdl.SDL_Window,
+
+    title: [:0]u8,
+    clear_color: Color,
+    icon: ?*sdl.SDL_Surface = null,
+
+    width: u32,
+    height: u32,
+
+    pub fn init(
+        allocator: std.mem.Allocator,
+        title: []const u8,
+        clear_color: Color,
+        icon: ?*sdl.SDL_Surface,
+        width: u32,
+        height: u32,
+    ) !Window {
+        const window_title = try allocator.dupeZ(u8, title);
+
+        const sdl_window: *sdl.SDL_Window = sdl.SDL_CreateWindow(
+            window_title.ptr,
+            @intCast(width),
+            @intCast(height),
+            sdl.SDL_WINDOW_RESIZABLE,
+        ) orelse util.sdlPanic();
+
+        if (icon) |surface| _ = sdl.SDL_SetWindowIcon(sdl_window, surface);
+
+        return Window{
+            .sdl_window = sdl_window,
+            .title = window_title,
+            .clear_color = clear_color,
+            .icon = icon,
+            .width = width,
+            .height = height,
+        };
+    }
+
+    pub fn deinit(self: *Window, allocator: std.mem.Allocator) void {
+        if (self.icon) |icon| sdl.SDL_DestroySurface(icon);
+        sdl.SDL_DestroyWindow(self.sdl_window);
+        allocator.free(self.title);
+    }
+};
+
 pub const WindowPlugin = struct {
     sdl_window: ?*sdl.SDL_Window = null,
     title: ?[:0]u8 = null,
@@ -30,69 +76,50 @@ pub const WindowPlugin = struct {
         allocator: *const std.mem.Allocator,
         world: *ecs.World,
     ) !void {
-        try world.addOneShotSystem(allocator.*, setup, self);
         try world.addObserver(allocator.*, onConfigLoaded, self);
         try world.addSystem(allocator.*, "update", readSDLWindowEvents, self);
         try world.addSystem(allocator.*, "update", update, self);
     }
 
     pub fn onConfigLoaded(
-        self: *WindowPlugin,
+        _: *WindowPlugin,
         allocator: *const std.mem.Allocator,
         world: *ecs.World,
         _: *const OnConfigLoaded,
     ) void {
         const config = world.getResource(Config) orelse return;
 
-        self.clear_color = Color.fromHex(config.window.clear_color) catch self.clear_color;
+        const clear_color = Color.fromHex(config.window.clear_color) catch Color{ .r = 0, .g = 0, .b = 0 };
 
-        const title = allocator.dupeZ(u8, config.window.title) catch return;
-        if (self.title) |old| allocator.free(old);
-        self.title = title;
+        const icon = if (world.getResource(AssetLoader)) |asset_loader|
+            asset_loader.loadImage(allocator.*, config.window.icon) catch null
+        else
+            null;
 
-        if (world.getResource(AssetLoader)) |asset_loader| {
-            if (asset_loader.loadImage(allocator.*, config.window.icon) catch null) |icon| {
-                if (self.icon) |old| sdl.SDL_DestroySurface(old);
-                self.icon = icon;
-            }
-        }
-
-        if (self.sdl_window) |sdl_window| {
-            _ = sdl.SDL_SetWindowTitle(sdl_window, title.ptr);
-
-            if (self.icon) |icon| {
-                _ = sdl.SDL_SetWindowIcon(sdl_window, icon);
-                sdl.SDL_DestroySurface(icon);
-                self.icon = null;
-            }
-        }
-    }
-
-    pub fn setup(self: *WindowPlugin, allocator: *const std.mem.Allocator, world: *ecs.World) void {
-        const sdl_window: *sdl.SDL_Window = sdl.SDL_CreateWindow(
-            if (self.title) |title| title.ptr else "Engine".ptr,
+        var window = Window.init(
+            allocator.*,
+            config.window.title,
+            clear_color,
+            icon,
             1280,
             720,
-            sdl.SDL_WINDOW_RESIZABLE,
-        ) orelse util.sdlPanic();
+        ) catch return;
 
-        self.sdl_window = sdl_window;
+        _ = world.addEntity(allocator.*, .{window}) catch {
+            window.deinit(allocator.*);
+            return;
+        };
 
-        if (self.icon) |icon| {
-            _ = sdl.SDL_SetWindowIcon(sdl_window, icon);
-            sdl.SDL_DestroySurface(icon);
-            self.icon = null;
-        }
-
-        world.trigger(allocator.*, OnWindowCreate{ .sdl_window = self.sdl_window.? });
+        world.trigger(allocator.*, OnWindowCreate{ .sdl_window = window.sdl_window });
     }
 
     pub fn readSDLWindowEvents(
-        self: *WindowPlugin,
+        _: *WindowPlugin,
         allocator: *const std.mem.Allocator,
         world: *ecs.World,
     ) void {
-        if (self.sdl_window == null) return;
+        var query = world.query(&.{Window});
+        if (query.next(world) == null) return;
 
         while (readSDLEvent()) |event| {
             switch (event.type) {
@@ -100,10 +127,8 @@ pub const WindowPlugin = struct {
                 sdl.SDL_EVENT_WINDOW_CLOSE_REQUESTED,
                 => {
                     world.trigger(allocator.*, OnWindowDestroy{});
-                    if (self.sdl_window) |window| sdl.SDL_DestroyWindow(window);
-                    self.sdl_window = null;
-
                     world.trigger(allocator.*, OnShutdown{});
+                    return;
                 },
                 else => {},
             }

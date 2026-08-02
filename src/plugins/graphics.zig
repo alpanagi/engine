@@ -9,7 +9,7 @@ const Material = @import("../material.zig").Material;
 
 const OnWindowDestroy = @import("window.zig").OnWindowDestroy;
 const OnWindowCreate = @import("window.zig").OnWindowCreate;
-const OnWindowUpdate = @import("window.zig").OnWindowUpdate;
+const Window = @import("window.zig").Window;
 
 pub const GraphicsPlugin = struct {
     device: ?*sdl.SDL_GPUDevice = null,
@@ -27,7 +27,7 @@ pub const GraphicsPlugin = struct {
     ) !void {
         try world.addObserver(allocator.*, onWindowCreate, self);
         try world.addObserver(allocator.*, onWindowDestroy, self);
-        try world.addObserver(allocator.*, onWindowUpdate, self);
+        try world.addSystem(allocator.*, "update", update, self);
     }
 
     pub fn onWindowCreate(
@@ -67,12 +67,16 @@ pub const GraphicsPlugin = struct {
         self.sdl_window = null;
     }
 
-    pub fn onWindowUpdate(
+    pub fn update(
         self: *GraphicsPlugin,
         _: *const std.mem.Allocator,
-        _: *ecs.World,
-        on_window_update: *const OnWindowUpdate,
+        world: *ecs.World,
     ) void {
+        if (self.device == null) return;
+
+        var query = world.query(&.{Window});
+        const window = (query.next(world) orelse return)[0];
+
         const commandBuffer = sdl.SDL_AcquireGPUCommandBuffer(self.device) orelse util.sdlPanic();
 
         var swapchainTexture: ?*sdl.SDL_GPUTexture = null;
@@ -80,7 +84,7 @@ pub const GraphicsPlugin = struct {
         var swapchainTextureHeight: sdl.Uint32 = 1;
         if (!sdl.SDL_WaitAndAcquireGPUSwapchainTexture(
             commandBuffer,
-            on_window_update.sdl_window,
+            window.sdl_window,
             &swapchainTexture,
             &swapchainTextureWidth,
             &swapchainTextureHeight,
@@ -92,10 +96,10 @@ pub const GraphicsPlugin = struct {
             const colorTargetInfo = sdl.SDL_GPUColorTargetInfo{
                 .texture = texture,
                 .clear_color = sdl.SDL_FColor{
-                    .r = on_window_update.clear_color.r,
-                    .g = on_window_update.clear_color.g,
-                    .b = on_window_update.clear_color.b,
-                    .a = on_window_update.clear_color.a,
+                    .r = window.clear_color.r,
+                    .g = window.clear_color.g,
+                    .b = window.clear_color.b,
+                    .a = window.clear_color.a,
                 },
                 .load_op = sdl.SDL_GPU_LOADOP_CLEAR,
                 .store_op = sdl.SDL_GPU_STOREOP_STORE,
