@@ -14,10 +14,12 @@ pub const plugins = struct {
 pub const resources = struct {
     pub const AssetLoader = @import("resources/asset_loader.zig").AssetLoader;
     pub const Config = @import("resources/config.zig").Config;
+    pub const Materials = @import("resources/materials/materials.zig").Materials;
     pub const Time = @import("resources/time.zig").Time;
 };
 
 const AssetLoader = resources.AssetLoader;
+const Materials = resources.Materials;
 const Time = resources.Time;
 const World = @import("ecs").World;
 
@@ -33,16 +35,26 @@ pub const Engine = struct {
         if (!sdl.SDL_Init(sdl.SDL_INIT_VIDEO)) util.sdlPanic();
 
         var world = World.init();
+        try addResources(&world, alloc, io, working_directory);
+
+        return Engine{
+            .world = world,
+        };
+    }
+
+    fn addResources(
+        world: *World,
+        alloc: std.mem.Allocator,
+        io: std.Io,
+        working_directory: []const u8,
+    ) !void {
         try world.addResource(
             alloc,
             AssetLoader,
             try AssetLoader.init(alloc, io, working_directory),
         );
         try world.addResource(alloc, Time, Time.init(io));
-
-        return Engine{
-            .world = world,
-        };
+        try world.addResource(alloc, Materials, .{});
     }
 
     pub fn deinit(self: *Engine, alloc: std.mem.Allocator) void {

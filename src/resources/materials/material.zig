@@ -2,7 +2,7 @@ const builtin = @import("builtin");
 const sdl = @import("sdl");
 const std = @import("std");
 
-const util = @import("util.zig");
+const util = @import("../../util.zig");
 
 pub const Material = struct {
     pipeline: *sdl.SDL_GPUGraphicsPipeline,

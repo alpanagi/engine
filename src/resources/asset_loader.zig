@@ -34,6 +34,18 @@ pub const AssetLoader = struct {
         return toml.parse(T, alloc, text) catch T.default(alloc);
     }
 
+    pub fn readBinaryFileAlloc(
+        self: *AssetLoader,
+        alloc: std.mem.Allocator,
+        path: []const u8,
+    ) ![]u8 {
+        const full_path = try std.fs.path.join(alloc, &.{ self.working_directory, path });
+        defer alloc.free(full_path);
+
+        const cwd = std.Io.Dir.cwd();
+        return cwd.readFileAlloc(self.io, full_path, alloc, .unlimited);
+    }
+
     pub fn loadImage(
         self: *AssetLoader,
         alloc: std.mem.Allocator,

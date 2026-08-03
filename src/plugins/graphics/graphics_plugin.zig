@@ -5,7 +5,9 @@ const ecs = @import("ecs");
 
 const util = @import("../../util.zig");
 
-const Material = @import("../../material.zig").Material;
+const AssetLoader = @import("../../resources/asset_loader.zig").AssetLoader;
+const Material = @import("../../resources/materials/material.zig").Material;
+const Materials = @import("../../resources/materials/materials.zig").Materials;
 
 const OnWindowDestroy = @import("../window_plugin.zig").OnWindowDestroy;
 const OnWindowCreate = @import("../window_plugin.zig").OnWindowCreate;
@@ -14,11 +16,6 @@ const Window = @import("../window_plugin.zig").Window;
 pub const GraphicsPlugin = struct {
     device: ?*sdl.SDL_GPUDevice = null,
     sdl_window: ?*sdl.SDL_Window = null,
-    materials: std.ArrayList(Material) = .empty,
-
-    pub fn deinit(self: *GraphicsPlugin, alloc: std.mem.Allocator) void {
-        self.materials.deinit(alloc);
-    }
 
     pub fn build(
         self: *GraphicsPlugin,
@@ -33,7 +30,7 @@ pub const GraphicsPlugin = struct {
     pub fn onWindowCreate(
         self: *GraphicsPlugin,
         allocator: *const std.mem.Allocator,
-        _: *ecs.World,
+        world: *ecs.World,
         on_window_create: *const OnWindowCreate,
     ) void {
         const device = sdl.SDL_CreateGPUDevice(
@@ -48,8 +45,22 @@ pub const GraphicsPlugin = struct {
 
         self.device = device;
         self.sdl_window = on_window_create.sdl_window;
-        self.materials = std.ArrayList(Material).initCapacity(allocator.*, 16) catch {
-            util.panic("Out of memory for shader allocation.\n", .{});
+
+        const asset_loader = world.getResource(AssetLoader) orelse return;
+        const materials = world.getResource(Materials) orelse return;
+
+        const shader_data = asset_loader.readBinaryFileAlloc(allocator.*, "assets/shaders/diffuse.spv") catch {
+            util.panic("Failed to read shader: assets/shaders/diffuse.spv\n", .{});
+        };
+        defer allocator.free(shader_data);
+
+        var reader = std.Io.Reader.fixed(shader_data);
+        const material = Material.init(device, &reader) catch {
+            util.panic("Failed to create material: assets/shaders/diffuse.spv\n", .{});
+        };
+
+        materials.add(allocator.*, material) catch {
+            util.panic("Out of memory for material allocation.\n", .{});
         };
     }
 
@@ -76,6 +87,8 @@ pub const GraphicsPlugin = struct {
 
         var query = world.query(&.{Window});
         const window = (query.next(world) orelse return)[0];
+
+        const materials = world.getResource(Materials) orelse return;
 
         const commandBuffer = sdl.SDL_AcquireGPUCommandBuffer(self.device) orelse util.sdlPanic();
 
@@ -106,18 +119,15 @@ pub const GraphicsPlugin = struct {
                 .cycle = false,
             };
             const renderPass = sdl.SDL_BeginGPURenderPass(commandBuffer, &colorTargetInfo, 1, null);
+
+            for (materials.materials.items) |material| {
+                sdl.SDL_BindGPUGraphicsPipeline(renderPass, material.pipeline);
+                sdl.SDL_DrawGPUPrimitives(renderPass, 3, 1, 0, 0);
+            }
+
             sdl.SDL_EndGPURenderPass(renderPass);
         }
 
         if (!sdl.SDL_SubmitGPUCommandBuffer(commandBuffer)) util.sdlPanic();
-    }
-
-    fn createMaterial(
-        self: *GraphicsPlugin,
-        alloc: std.mem.Allocator,
-        reader: *std.Io.Reader,
-    ) !void {
-        const material = try Material.init(self.device, reader);
-        try self.materials.append(alloc, material);
     }
 };
