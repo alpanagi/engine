@@ -4,8 +4,11 @@ const std = @import("std");
 
 const util = @import("../../util.zig");
 
+const GPUBuffer = @import("gpu_buffer.zig").GPUBuffer;
+
 pub const Material = struct {
     pipeline: *sdl.SDL_GPUGraphicsPipeline,
+    vertex_buffer: ?GPUBuffer = null,
 
     pub fn init(device: *sdl.SDL_GPUDevice, reader: *std.Io.Reader) !Material {
         var buffer: [1024 * 1024]u8 = undefined;
@@ -25,9 +28,21 @@ pub const Material = struct {
             shaderData,
         );
 
+        const vertexBufferDescription = sdl.SDL_GPUVertexBufferDescription{
+            .slot = 0,
+            .pitch = @sizeOf(f32) * 3,
+            .input_rate = sdl.SDL_GPU_VERTEXINPUTRATE_VERTEX,
+        };
+        const vertexAttribute = sdl.SDL_GPUVertexAttribute{
+            .location = 0,
+            .buffer_slot = 0,
+            .format = sdl.SDL_GPU_VERTEXELEMENTFORMAT_FLOAT3,
+        };
         const vertexInputState = sdl.SDL_GPUVertexInputState{
-            .num_vertex_buffers = 0,
-            .num_vertex_attributes = 0,
+            .vertex_buffer_descriptions = &vertexBufferDescription,
+            .num_vertex_buffers = 1,
+            .vertex_attributes = &vertexAttribute,
+            .num_vertex_attributes = 1,
         };
         const rasterizerState = sdl.SDL_GPURasterizerState{
             .fill_mode = sdl.SDL_GPU_FILLMODE_FILL,
@@ -86,6 +101,31 @@ pub const Material = struct {
         return Material{
             .pipeline = pipeline,
         };
+    }
+
+    pub fn deinit(self: *Material, device: *sdl.SDL_GPUDevice) void {
+        self.freeGpuBuffers(device);
+        sdl.SDL_ReleaseGPUGraphicsPipeline(device, self.pipeline);
+    }
+
+    pub fn setVertices(self: *Material, device: *sdl.SDL_GPUDevice, vertices: []const f32) void {
+        const data = std.mem.sliceAsBytes(vertices);
+        const size: u32 = @intCast(data.len);
+
+        const needsBuffer = if (self.vertex_buffer) |buffer| buffer.size != size else true;
+        if (needsBuffer) {
+            self.freeGpuBuffers(device);
+            self.vertex_buffer = GPUBuffer.init(device, sdl.SDL_GPU_BUFFERUSAGE_VERTEX, size);
+        }
+
+        self.vertex_buffer.?.write(device, data);
+    }
+
+    pub fn freeGpuBuffers(self: *Material, device: *sdl.SDL_GPUDevice) void {
+        if (self.vertex_buffer) |*buffer| {
+            buffer.deinit(device);
+            self.vertex_buffer = null;
+        }
     }
 };
 

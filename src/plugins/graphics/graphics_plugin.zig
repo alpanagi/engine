@@ -24,7 +24,8 @@ pub const GraphicsPlugin = struct {
     ) !void {
         try world.addObserver(allocator.*, onWindowCreate, self);
         try world.addObserver(allocator.*, onWindowDestroy, self);
-        try world.addSystem(allocator.*, "update", update, self);
+        try world.addSystem(allocator.*, "post-update", uploadBuffers, self);
+        try world.addSystem(allocator.*, "post-update", draw, self);
     }
 
     pub fn onWindowCreate(
@@ -55,9 +56,16 @@ pub const GraphicsPlugin = struct {
         defer allocator.free(shader_data);
 
         var reader = std.Io.Reader.fixed(shader_data);
-        const material = Material.init(device, &reader) catch {
+        var material = Material.init(device, &reader) catch {
             util.panic("Failed to create material: assets/shaders/diffuse.spv\n", .{});
         };
+
+        const vertices = [_]f32{
+            0.0,  -0.5, 0.0,
+            -0.5, 0.5,  0.0,
+            0.5,  0.5,  0.0,
+        };
+        material.setVertices(device, &vertices);
 
         materials.add(allocator.*, material) catch {
             util.panic("Out of memory for material allocation.\n", .{});
@@ -78,7 +86,37 @@ pub const GraphicsPlugin = struct {
         self.sdl_window = null;
     }
 
-    pub fn update(
+    pub fn uploadBuffers(
+        self: *GraphicsPlugin,
+        _: *const std.mem.Allocator,
+        world: *ecs.World,
+    ) void {
+        const device = self.device orelse return;
+        const materials = world.getResource(Materials) orelse return;
+
+        var commandBuffer: ?*sdl.SDL_GPUCommandBuffer = null;
+        var copyPass: ?*sdl.SDL_GPUCopyPass = null;
+
+        for (materials.materials.items) |*material| {
+            if (material.vertex_buffer) |*buffer| {
+                if (!buffer.dirty) continue;
+
+                if (copyPass == null) {
+                    commandBuffer = sdl.SDL_AcquireGPUCommandBuffer(device) orelse util.sdlPanic();
+                    copyPass = sdl.SDL_BeginGPUCopyPass(commandBuffer.?) orelse util.sdlPanic();
+                }
+
+                buffer.upload(copyPass.?);
+            }
+        }
+
+        if (copyPass) |pass| {
+            sdl.SDL_EndGPUCopyPass(pass);
+            if (!sdl.SDL_SubmitGPUCommandBuffer(commandBuffer.?)) util.sdlPanic();
+        }
+    }
+
+    pub fn draw(
         self: *GraphicsPlugin,
         _: *const std.mem.Allocator,
         world: *ecs.World,
@@ -121,7 +159,16 @@ pub const GraphicsPlugin = struct {
             const renderPass = sdl.SDL_BeginGPURenderPass(commandBuffer, &colorTargetInfo, 1, null);
 
             for (materials.materials.items) |material| {
+                const vertex_buffer = material.vertex_buffer orelse continue;
+
                 sdl.SDL_BindGPUGraphicsPipeline(renderPass, material.pipeline);
+
+                const binding = sdl.SDL_GPUBufferBinding{
+                    .buffer = vertex_buffer.buffer,
+                    .offset = 0,
+                };
+                sdl.SDL_BindGPUVertexBuffers(renderPass, 0, &binding, 1);
+
                 sdl.SDL_DrawGPUPrimitives(renderPass, 3, 1, 0, 0);
             }
 
