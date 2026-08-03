@@ -3,13 +3,13 @@ const std = @import("std");
 
 const ecs = @import("ecs");
 
-const util = @import("../util.zig");
+const util = @import("../../util.zig");
 
-const Material = @import("../material.zig").Material;
+const Material = @import("../../material.zig").Material;
 
-const OnWindowDestroy = @import("window.zig").OnWindowDestroy;
-const OnWindowCreate = @import("window.zig").OnWindowCreate;
-const Window = @import("window.zig").Window;
+const OnWindowDestroy = @import("../window_plugin.zig").OnWindowDestroy;
+const OnWindowCreate = @import("../window_plugin.zig").OnWindowCreate;
+const Window = @import("../window_plugin.zig").Window;
 
 pub const GraphicsPlugin = struct {
     device: ?*sdl.SDL_GPUDevice = null,

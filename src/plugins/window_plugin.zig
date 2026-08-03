@@ -7,7 +7,7 @@ const util = @import("../util.zig");
 const AssetLoader = @import("../resources/asset_loader.zig").AssetLoader;
 const Color = @import("../color.zig").Color;
 const Config = @import("../resources/config.zig").Config;
-const OnConfigLoaded = @import("config.zig").OnConfigLoaded;
+const OnConfigLoaded = @import("config_plugin.zig").OnConfigLoaded;
 const OnShutdown = @import("../engine.zig").OnShutdown;
 
 pub const OnWindowCreate = struct { sdl_window: *sdl.SDL_Window };

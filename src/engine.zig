@@ -4,11 +4,11 @@ const std = @import("std");
 const util = @import("util.zig");
 
 pub const plugins = struct {
-    pub const ConfigPlugin = @import("plugins/config.zig").ConfigPlugin;
-    pub const GraphicsPlugin = @import("plugins/graphics.zig").GraphicsPlugin;
-    pub const ModuleLoaderPlugin = @import("plugins/module_loader.zig").ModuleLoaderPlugin;
-    pub const TimePlugin = @import("plugins/time.zig").TimePlugin;
-    pub const WindowPlugin = @import("plugins/window.zig").WindowPlugin;
+    pub const ConfigPlugin = @import("plugins/config_plugin.zig").ConfigPlugin;
+    pub const GraphicsPlugin = @import("plugins/graphics/graphics_plugin.zig").GraphicsPlugin;
+    pub const ModuleLoaderPlugin = @import("plugins/module_loader_plugin.zig").ModuleLoaderPlugin;
+    pub const TimePlugin = @import("plugins/time_plugin.zig").TimePlugin;
+    pub const WindowPlugin = @import("plugins/window_plugin.zig").WindowPlugin;
 };
 
 pub const resources = struct {
