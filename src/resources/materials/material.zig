@@ -111,6 +111,7 @@ pub const Material = struct {
     pub fn setVertices(self: *Material, device: *sdl.SDL_GPUDevice, vertices: []const f32) void {
         const data = std.mem.sliceAsBytes(vertices);
         const size: u32 = @intCast(data.len);
+        const count: u32 = @intCast(vertices.len / 3);
 
         const needsBuffer = if (self.vertex_buffer) |buffer| buffer.size != size else true;
         if (needsBuffer) {
@@ -118,7 +119,7 @@ pub const Material = struct {
             self.vertex_buffer = GPUBuffer.init(device, sdl.SDL_GPU_BUFFERUSAGE_VERTEX, size);
         }
 
-        self.vertex_buffer.?.write(device, data);
+        self.vertex_buffer.?.write(device, data, count);
     }
 
     pub fn freeGpuBuffers(self: *Material, device: *sdl.SDL_GPUDevice) void {

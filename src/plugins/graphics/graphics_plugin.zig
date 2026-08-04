@@ -169,7 +169,7 @@ pub const GraphicsPlugin = struct {
                 };
                 sdl.SDL_BindGPUVertexBuffers(renderPass, 0, &binding, 1);
 
-                sdl.SDL_DrawGPUPrimitives(renderPass, 3, 1, 0, 0);
+                sdl.SDL_DrawGPUPrimitives(renderPass, vertex_buffer.count, 1, 0, 0);
             }
 
             sdl.SDL_EndGPURenderPass(renderPass);

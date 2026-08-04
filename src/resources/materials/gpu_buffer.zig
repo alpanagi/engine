@@ -7,6 +7,7 @@ pub const GPUBuffer = struct {
     transferBuffer: *sdl.SDL_GPUTransferBuffer,
     usage: sdl.SDL_GPUBufferUsageFlags,
     size: u32,
+    count: u32 = 0,
     dirty: bool = false,
 
     pub fn init(
@@ -46,7 +47,7 @@ pub const GPUBuffer = struct {
         sdl.SDL_ReleaseGPUBuffer(device, self.buffer);
     }
 
-    pub fn write(self: *GPUBuffer, device: *sdl.SDL_GPUDevice, data: []const u8) void {
+    pub fn write(self: *GPUBuffer, device: *sdl.SDL_GPUDevice, data: []const u8, count: u32) void {
         const mapped = sdl.SDL_MapGPUTransferBuffer(
             device,
             self.transferBuffer,
@@ -57,6 +58,7 @@ pub const GPUBuffer = struct {
 
         sdl.SDL_UnmapGPUTransferBuffer(device, self.transferBuffer);
 
+        self.count = count;
         self.dirty = true;
     }
 
