@@ -61,9 +61,9 @@ pub const GraphicsPlugin = struct {
         };
 
         const vertices = [_]f32{
-            0.0,  -0.5, 0.0,
-            -0.5, 0.5,  0.0,
-            0.5,  0.5,  0.0,
+            0.0,  0.5,  0.0,
+            -0.5, -0.5, 0.0,
+            0.5,  -0.5, 0.0,
         };
         material.setVertices(device, &vertices);
 
