@@ -6,6 +6,9 @@ pub const Materials = struct {
     materials: std.ArrayList(Material) = .empty,
 
     pub fn deinit(self: *Materials, alloc: std.mem.Allocator) void {
+        for (self.materials.items) |*material| {
+            material.gpu_meshes.deinit(alloc);
+        }
         self.materials.deinit(alloc);
     }
 

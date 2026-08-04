@@ -6,12 +6,19 @@ const ecs = @import("ecs");
 const util = @import("../../util.zig");
 
 const AssetLoader = @import("../../resources/asset_loader.zig").AssetLoader;
+const GPUMesh = @import("../../resources/materials/gpu_mesh.zig").GPUMesh;
+const Instance = @import("../../resources/materials/instance.zig").Instance;
 const Material = @import("../../resources/materials/material.zig").Material;
 const Materials = @import("../../resources/materials/materials.zig").Materials;
 
 const OnWindowDestroy = @import("../window_plugin.zig").OnWindowDestroy;
-const OnWindowCreate = @import("../window_plugin.zig").OnWindowCreate;
 const Window = @import("../window_plugin.zig").Window;
+
+pub const Mesh = struct {
+    material_index: u32,
+    gpu_mesh_index: u32,
+    instance_index: ?u32 = null,
+};
 
 pub const GraphicsPlugin = struct {
     device: ?*sdl.SDL_GPUDevice = null,
@@ -24,6 +31,7 @@ pub const GraphicsPlugin = struct {
     ) !void {
         try world.addObserver(allocator.*, onWindowCreate, self);
         try world.addObserver(allocator.*, onWindowDestroy, self);
+        try world.addObserver(allocator.*, onMeshCreate, self);
         try world.addSystem(allocator.*, "post-update", uploadBuffers, self);
         try world.addSystem(allocator.*, "post-update", draw, self);
     }
@@ -32,25 +40,39 @@ pub const GraphicsPlugin = struct {
         self: *GraphicsPlugin,
         allocator: *const std.mem.Allocator,
         world: *ecs.World,
-        on_window_create: *const OnWindowCreate,
+        created: *const ecs.Created(Window),
     ) void {
+        const window = (world.getEntity(created.entity, &.{Window}) catch return)[0];
+
         const device = sdl.SDL_CreateGPUDevice(
             sdl.SDL_GPU_SHADERFORMAT_SPIRV,
             false,
             "vulkan",
         ) orelse util.sdlPanic();
 
-        if (!sdl.SDL_ClaimWindowForGPUDevice(device, on_window_create.sdl_window)) {
+        if (!sdl.SDL_ClaimWindowForGPUDevice(device, window.sdl_window)) {
             util.sdlPanic();
         }
 
         self.device = device;
-        self.sdl_window = on_window_create.sdl_window;
+        self.sdl_window = window.sdl_window;
 
         const asset_loader = world.getResource(AssetLoader) orelse return;
         const materials = world.getResource(Materials) orelse return;
 
-        const shader_data = asset_loader.readBinaryFileAlloc(allocator.*, "assets/shaders/diffuse.spv") catch {
+        const mesh = loadMesh(device, allocator.*, asset_loader, materials);
+        world.spawn(allocator.*, .{mesh}) catch {
+            util.panic("Out of memory for mesh entity allocation.\n", .{});
+        };
+    }
+
+    fn loadMesh(
+        device: *sdl.SDL_GPUDevice,
+        allocator: std.mem.Allocator,
+        asset_loader: *AssetLoader,
+        materials: *Materials,
+    ) Mesh {
+        const shader_data = asset_loader.readBinaryFileAlloc(allocator, "assets/shaders/diffuse.spv") catch {
             util.panic("Failed to read shader: assets/shaders/diffuse.spv\n", .{});
         };
         defer allocator.free(shader_data);
@@ -67,9 +89,37 @@ pub const GraphicsPlugin = struct {
         };
         material.setVertices(device, &vertices);
 
-        materials.add(allocator.*, material) catch {
+        const gpu_mesh_index: u32 = @intCast(material.gpu_meshes.items.len);
+        const gpu_mesh = GPUMesh.init(device, 0, @intCast(vertices.len / 3));
+        material.gpu_meshes.append(allocator, gpu_mesh) catch {
+            util.panic("Out of memory for gpu mesh allocation.\n", .{});
+        };
+
+        const material_index: u32 = @intCast(materials.materials.items.len);
+        materials.add(allocator, material) catch {
             util.panic("Out of memory for material allocation.\n", .{});
         };
+
+        return Mesh{
+            .material_index = material_index,
+            .gpu_mesh_index = gpu_mesh_index,
+        };
+    }
+
+    pub fn onMeshCreate(
+        self: *GraphicsPlugin,
+        _: *const std.mem.Allocator,
+        world: *ecs.World,
+        created: *const ecs.Created(Mesh),
+    ) void {
+        const device = self.device orelse return;
+        const materials = world.getResource(Materials) orelse return;
+
+        const mesh = (world.getEntity(created.entity, &.{Mesh}) catch return)[0];
+        const material = &materials.materials.items[mesh.material_index];
+        const gpu_mesh = &material.gpu_meshes.items[mesh.gpu_mesh_index];
+
+        mesh.instance_index = gpu_mesh.addInstance(device, Instance{ .location = .{ 0, 0, 0 } });
     }
 
     pub fn onWindowDestroy(
@@ -169,7 +219,15 @@ pub const GraphicsPlugin = struct {
                 };
                 sdl.SDL_BindGPUVertexBuffers(renderPass, 0, &binding, 1);
 
-                sdl.SDL_DrawGPUPrimitives(renderPass, vertex_buffer.count, 1, 0, 0);
+                for (material.gpu_meshes.items) |gpu_mesh| {
+                    sdl.SDL_DrawGPUPrimitives(
+                        renderPass,
+                        gpu_mesh.vertex_count,
+                        gpu_mesh.instance_buffer.count,
+                        gpu_mesh.vertex_offset,
+                        0,
+                    );
+                }
             }
 
             sdl.SDL_EndGPURenderPass(renderPass);

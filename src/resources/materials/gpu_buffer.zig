@@ -62,6 +62,45 @@ pub const GPUBuffer = struct {
         self.dirty = true;
     }
 
+    pub fn append(self: *GPUBuffer, device: *sdl.SDL_GPUDevice, data: []const u8, count: u32) void {
+        const record_size: u32 = @intCast(data.len / count);
+        const offset = self.count * record_size;
+
+        const mapped = sdl.SDL_MapGPUTransferBuffer(
+            device,
+            self.transferBuffer,
+            false,
+        ) orelse util.sdlPanic();
+
+        @memcpy(@as([*]u8, @ptrCast(mapped))[offset..][0..data.len], data);
+
+        sdl.SDL_UnmapGPUTransferBuffer(device, self.transferBuffer);
+
+        self.count += count;
+        self.dirty = true;
+    }
+
+    pub fn grow(self: *GPUBuffer, device: *sdl.SDL_GPUDevice, new_size: u32) void {
+        var new_buffer = GPUBuffer.init(device, self.usage, new_size);
+
+        const old_mapped = sdl.SDL_MapGPUTransferBuffer(device, self.transferBuffer, false) orelse util.sdlPanic();
+        const new_mapped = sdl.SDL_MapGPUTransferBuffer(device, new_buffer.transferBuffer, false) orelse util.sdlPanic();
+
+        @memcpy(
+            @as([*]u8, @ptrCast(new_mapped))[0..self.size],
+            @as([*]u8, @ptrCast(old_mapped))[0..self.size],
+        );
+
+        sdl.SDL_UnmapGPUTransferBuffer(device, self.transferBuffer);
+        sdl.SDL_UnmapGPUTransferBuffer(device, new_buffer.transferBuffer);
+
+        new_buffer.count = self.count;
+        new_buffer.dirty = true;
+
+        self.deinit(device);
+        self.* = new_buffer;
+    }
+
     pub fn upload(self: *GPUBuffer, copyPass: *sdl.SDL_GPUCopyPass) void {
         const source = sdl.SDL_GPUTransferBufferLocation{
             .transfer_buffer = self.transferBuffer,

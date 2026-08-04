@@ -5,10 +5,12 @@ const std = @import("std");
 const util = @import("../../util.zig");
 
 const GPUBuffer = @import("gpu_buffer.zig").GPUBuffer;
+const GPUMesh = @import("gpu_mesh.zig").GPUMesh;
 
 pub const Material = struct {
     pipeline: *sdl.SDL_GPUGraphicsPipeline,
     vertex_buffer: ?GPUBuffer = null,
+    gpu_meshes: std.ArrayList(GPUMesh) = .empty,
 
     pub fn init(device: *sdl.SDL_GPUDevice, reader: *std.Io.Reader) !Material {
         var buffer: [1024 * 1024]u8 = undefined;

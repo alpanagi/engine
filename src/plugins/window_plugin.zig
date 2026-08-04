@@ -10,9 +10,7 @@ const Config = @import("../resources/config.zig").Config;
 const OnConfigLoaded = @import("config_plugin.zig").OnConfigLoaded;
 const OnShutdown = @import("../engine.zig").OnShutdown;
 
-pub const OnWindowCreate = struct { sdl_window: *sdl.SDL_Window };
 pub const OnWindowDestroy = struct {};
-pub const OnWindowUpdate = struct { sdl_window: *sdl.SDL_Window, clear_color: Color };
 
 pub const Window = struct {
     sdl_window: *sdl.SDL_Window,
@@ -61,10 +59,8 @@ pub const Window = struct {
 };
 
 pub const WindowPlugin = struct {
-    sdl_window: ?*sdl.SDL_Window = null,
     title: ?[:0]u8 = null,
     icon: ?*sdl.SDL_Surface = null,
-    clear_color: Color = Color.fromHex("#000000") catch unreachable,
 
     pub fn deinit(self: *WindowPlugin, allocator: std.mem.Allocator) void {
         if (self.title) |title| allocator.free(title);
@@ -78,7 +74,6 @@ pub const WindowPlugin = struct {
     ) !void {
         try world.addObserver(allocator.*, onConfigLoaded, self);
         try world.addSystem(allocator.*, "update", readSDLWindowEvents, self);
-        try world.addSystem(allocator.*, "update", update, self);
     }
 
     pub fn onConfigLoaded(
@@ -105,12 +100,10 @@ pub const WindowPlugin = struct {
             720,
         ) catch return;
 
-        _ = world.addEntity(allocator.*, .{window}) catch {
+        world.spawn(allocator.*, .{window}) catch {
             window.deinit(allocator.*);
             return;
         };
-
-        world.trigger(allocator.*, OnWindowCreate{ .sdl_window = window.sdl_window });
     }
 
     pub fn readSDLWindowEvents(
@@ -135,18 +128,6 @@ pub const WindowPlugin = struct {
         }
     }
 
-    pub fn update(
-        self: *WindowPlugin,
-        allocator: *const std.mem.Allocator,
-        world: *ecs.World,
-    ) void {
-        if (self.sdl_window == null) return;
-
-        world.trigger(allocator.*, OnWindowUpdate{
-            .sdl_window = self.sdl_window.?,
-            .clear_color = self.clear_color,
-        });
-    }
 };
 
 fn readSDLEvent() ?sdl.SDL_Event {
