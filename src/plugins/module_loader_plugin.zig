@@ -2,7 +2,7 @@ const std = @import("std");
 
 const ecs = @import("ecs");
 
-const AssetLoader = @import("../resources/asset_loader.zig").AssetLoader;
+const AssetLoader = @import("../resources/asset_loader/asset_loader.zig").AssetLoader;
 
 pub const RegisterModuleFunction = *const fn (allocator: *const std.mem.Allocator, world: *ecs.World) callconv(.c) void;
 

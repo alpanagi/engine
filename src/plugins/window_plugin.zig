@@ -4,7 +4,7 @@ const std = @import("std");
 
 const util = @import("../util.zig");
 
-const AssetLoader = @import("../resources/asset_loader.zig").AssetLoader;
+const AssetLoader = @import("../resources/asset_loader/asset_loader.zig").AssetLoader;
 const Color = @import("../color.zig").Color;
 const Config = @import("../resources/config.zig").Config;
 const OnConfigLoaded = @import("config_plugin.zig").OnConfigLoaded;

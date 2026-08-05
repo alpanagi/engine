@@ -5,7 +5,7 @@ const ecs = @import("ecs");
 
 const util = @import("../../util.zig");
 
-const AssetLoader = @import("../../resources/asset_loader.zig").AssetLoader;
+const AssetLoader = @import("../../resources/asset_loader/asset_loader.zig").AssetLoader;
 const Mesh = @import("../../components/mesh.zig").Mesh;
 const GPUMesh = @import("../../resources/materials/gpu_mesh.zig").GPUMesh;
 const Instance = @import("../../resources/materials/instance.zig").Instance;

@@ -16,7 +16,7 @@ pub const plugins = struct {
 };
 
 pub const resources = struct {
-    pub const AssetLoader = @import("resources/asset_loader.zig").AssetLoader;
+    pub const AssetLoader = @import("resources/asset_loader/asset_loader.zig").AssetLoader;
     pub const Config = @import("resources/config.zig").Config;
     pub const Materials = @import("resources/materials/materials.zig").Materials;
     pub const Time = @import("resources/time.zig").Time;

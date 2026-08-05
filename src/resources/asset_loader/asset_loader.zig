@@ -3,6 +3,10 @@ const sdl_image = @import("sdl_image");
 const std = @import("std");
 const toml = @import("toml");
 
+const obj = @import("obj.zig");
+
+const MeshData = @import("../mesh_data.zig").MeshData;
+
 pub const AssetLoader = struct {
     io: std.Io,
     working_directory: []const u8,
@@ -44,6 +48,23 @@ pub const AssetLoader = struct {
 
         const cwd = std.Io.Dir.cwd();
         return cwd.readFileAlloc(self.io, full_path, alloc, .unlimited);
+    }
+
+    pub fn loadObj(
+        self: *AssetLoader,
+        alloc: std.mem.Allocator,
+        path: []const u8,
+    ) !MeshData {
+        const full_path = try std.fs.path.join(alloc, &.{ self.working_directory, path });
+        defer alloc.free(full_path);
+
+        var file = try std.Io.Dir.cwd().openFile(self.io, full_path, .{ .mode = .read_only });
+        defer file.close(self.io);
+
+        var buffer: [4096]u8 = undefined;
+        var reader = file.reader(self.io, &buffer);
+
+        return obj.parse(alloc, &reader.interface);
     }
 
     pub fn loadImage(

@@ -1,7 +1,7 @@
 const ecs = @import("ecs");
 const std = @import("std");
 
-const AssetLoader = @import("../resources/asset_loader.zig").AssetLoader;
+const AssetLoader = @import("../resources/asset_loader/asset_loader.zig").AssetLoader;
 const Config = @import("../resources/config.zig").Config;
 
 pub const OnConfigLoaded = struct {};
