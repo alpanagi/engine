@@ -3,6 +3,10 @@ const std = @import("std");
 
 const util = @import("util.zig");
 
+pub const components = struct {
+    pub const Mesh = @import("components/mesh.zig").Mesh;
+};
+
 pub const plugins = struct {
     pub const ConfigPlugin = @import("plugins/config_plugin.zig").ConfigPlugin;
     pub const GraphicsPlugin = @import("plugins/graphics/graphics_plugin.zig").GraphicsPlugin;

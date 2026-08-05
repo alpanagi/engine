@@ -6,6 +6,7 @@ const ecs = @import("ecs");
 const util = @import("../../util.zig");
 
 const AssetLoader = @import("../../resources/asset_loader.zig").AssetLoader;
+const Mesh = @import("../../components/mesh.zig").Mesh;
 const GPUMesh = @import("../../resources/materials/gpu_mesh.zig").GPUMesh;
 const Instance = @import("../../resources/materials/instance.zig").Instance;
 const Material = @import("../../resources/materials/material.zig").Material;
@@ -13,12 +14,6 @@ const Materials = @import("../../resources/materials/materials.zig").Materials;
 
 const OnWindowDestroy = @import("../window_plugin.zig").OnWindowDestroy;
 const Window = @import("../window_plugin.zig").Window;
-
-pub const Mesh = struct {
-    material_index: u32,
-    gpu_mesh_index: u32,
-    instance_index: ?u32 = null,
-};
 
 pub const GraphicsPlugin = struct {
     device: ?*sdl.SDL_GPUDevice = null,
@@ -38,7 +33,7 @@ pub const GraphicsPlugin = struct {
 
     pub fn onWindowCreate(
         self: *GraphicsPlugin,
-        allocator: *const std.mem.Allocator,
+        _: *const std.mem.Allocator,
         world: *ecs.World,
         created: *const ecs.Created(Window),
     ) void {
@@ -56,30 +51,55 @@ pub const GraphicsPlugin = struct {
 
         self.device = device;
         self.sdl_window = window.sdl_window;
-
-        const asset_loader = world.getResource(AssetLoader) orelse return;
-        const materials = world.getResource(Materials) orelse return;
-
-        const mesh = loadMesh(device, allocator.*, asset_loader, materials);
-        world.spawn(allocator.*, .{mesh}) catch {
-            util.panic("Out of memory for mesh entity allocation.\n", .{});
-        };
     }
 
-    fn loadMesh(
+    pub fn onMeshCreate(
+        self: *GraphicsPlugin,
+        allocator: *const std.mem.Allocator,
+        world: *ecs.World,
+        created: *const ecs.Created(Mesh),
+    ) void {
+        const device = self.device orelse return;
+        const materials = world.getResource(Materials) orelse return;
+
+        const mesh = (world.getEntity(created.entity, &.{Mesh}) catch return)[0];
+
+        const material_index = materials.find(mesh.material) orelse
+            loadMaterial(device, allocator.*, world, materials, mesh.material) orelse return;
+
+        const material = &materials.materials.items[material_index];
+        if (material.gpu_meshes.items.len == 0) return;
+
+        const gpu_mesh_index: u32 = 0;
+        const gpu_mesh = &material.gpu_meshes.items[gpu_mesh_index];
+
+        mesh.material_index = material_index;
+        mesh.gpu_mesh_index = gpu_mesh_index;
+        mesh.instance_index = gpu_mesh.addInstance(device, Instance{ .location = .{ 0, 0, 0 } });
+    }
+
+    fn loadMaterial(
         device: *sdl.SDL_GPUDevice,
         allocator: std.mem.Allocator,
-        asset_loader: *AssetLoader,
+        world: *ecs.World,
         materials: *Materials,
-    ) Mesh {
-        const shader_data = asset_loader.readBinaryFileAlloc(allocator, "assets/shaders/diffuse.spv") catch {
-            util.panic("Failed to read shader: assets/shaders/diffuse.spv\n", .{});
+        id: []const u8,
+    ) ?u32 {
+        const asset_loader = world.getResource(AssetLoader) orelse return null;
+
+        const path = std.fmt.allocPrint(allocator, "assets/shaders/{s}.spv", .{id}) catch {
+            util.panic("Out of memory for shader path allocation.\n", .{});
+        };
+        defer allocator.free(path);
+
+        const shader_data = asset_loader.readBinaryFileAlloc(allocator, path) catch {
+            util.panic("Failed to read shader: {s}\n", .{path});
         };
         defer allocator.free(shader_data);
 
         var reader = std.Io.Reader.fixed(shader_data);
         var material = Material.init(device, &reader) catch {
-            util.panic("Failed to create material: assets/shaders/diffuse.spv\n", .{});
+            util.panic("Failed to create material: {s}\n", .{path});
         };
 
         const vertices = [_]f32{
@@ -89,46 +109,28 @@ pub const GraphicsPlugin = struct {
         };
         material.setVertices(device, &vertices);
 
-        const gpu_mesh_index: u32 = @intCast(material.gpu_meshes.items.len);
         const gpu_mesh = GPUMesh.init(device, 0, @intCast(vertices.len / 3));
         material.gpu_meshes.append(allocator, gpu_mesh) catch {
             util.panic("Out of memory for gpu mesh allocation.\n", .{});
         };
 
         const material_index: u32 = @intCast(materials.materials.items.len);
-        materials.add(allocator, material) catch {
+        materials.add(allocator, id, material) catch {
             util.panic("Out of memory for material allocation.\n", .{});
         };
 
-        return Mesh{
-            .material_index = material_index,
-            .gpu_mesh_index = gpu_mesh_index,
-        };
-    }
-
-    pub fn onMeshCreate(
-        self: *GraphicsPlugin,
-        _: *const std.mem.Allocator,
-        world: *ecs.World,
-        created: *const ecs.Created(Mesh),
-    ) void {
-        const device = self.device orelse return;
-        const materials = world.getResource(Materials) orelse return;
-
-        const mesh = (world.getEntity(created.entity, &.{Mesh}) catch return)[0];
-        const material = &materials.materials.items[mesh.material_index];
-        const gpu_mesh = &material.gpu_meshes.items[mesh.gpu_mesh_index];
-
-        mesh.instance_index = gpu_mesh.addInstance(device, Instance{ .location = .{ 0, 0, 0 } });
+        return material_index;
     }
 
     pub fn onWindowDestroy(
         self: *GraphicsPlugin,
-        _: *const std.mem.Allocator,
-        _: *ecs.World,
+        allocator: *const std.mem.Allocator,
+        world: *ecs.World,
         _: *const OnWindowDestroy,
     ) void {
         if (self.device) |device| {
+            if (world.getResource(Materials)) |materials| materials.sdlDeinit(allocator.*, device);
+
             if (self.sdl_window) |window| sdl.SDL_ReleaseWindowFromGPUDevice(device, window);
             sdl.SDL_DestroyGPUDevice(device);
             self.device = null;

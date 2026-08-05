@@ -21,10 +21,14 @@ pub const GPUMesh = struct {
             .vertex_count = vertex_count,
             .instance_buffer = GPUBuffer.init(
                 device,
-                sdl.SDL_GPU_BUFFERUSAGE_VERTEX,
+                sdl.SDL_GPU_BUFFERUSAGE_VERTEX | sdl.SDL_GPU_BUFFERUSAGE_GRAPHICS_STORAGE_READ,
                 initial_instance_capacity * @sizeOf(Instance),
             ),
         };
+    }
+
+    pub fn deinit(self: *GPUMesh, device: *sdl.SDL_GPUDevice) void {
+        self.instance_buffer.deinit(device);
     }
 
     pub fn writeInstances(

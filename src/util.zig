@@ -1,6 +1,12 @@
 const sdl = @import("sdl");
 const std = @import("std");
 
+const seed: u64 = 1234;
+
+pub fn hashBytes(bytes: []const u8) u64 {
+    return std.hash.Wyhash.hash(seed, bytes);
+}
+
 pub fn panic(comptime message: []const u8, args: anytype) noreturn {
     std.log.err(message, args);
     std.process.exit(1);

@@ -105,7 +105,13 @@ pub const Material = struct {
         };
     }
 
-    pub fn deinit(self: *Material, device: *sdl.SDL_GPUDevice) void {
+    pub fn deinit(self: *Material, alloc: std.mem.Allocator) void {
+        self.gpu_meshes.deinit(alloc);
+    }
+
+    pub fn sdlDeinit(self: *Material, device: *sdl.SDL_GPUDevice) void {
+        for (self.gpu_meshes.items) |*gpu_mesh| gpu_mesh.deinit(device);
+
         self.freeGpuBuffers(device);
         sdl.SDL_ReleaseGPUGraphicsPipeline(device, self.pipeline);
     }
@@ -124,7 +130,7 @@ pub const Material = struct {
         self.vertex_buffer.?.write(device, data, count);
     }
 
-    pub fn freeGpuBuffers(self: *Material, device: *sdl.SDL_GPUDevice) void {
+    fn freeGpuBuffers(self: *Material, device: *sdl.SDL_GPUDevice) void {
         if (self.vertex_buffer) |*buffer| {
             buffer.deinit(device);
             self.vertex_buffer = null;
