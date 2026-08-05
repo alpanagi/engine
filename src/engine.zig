@@ -5,6 +5,7 @@ const util = @import("util.zig");
 
 pub const components = struct {
     pub const Mesh = @import("components/mesh.zig").Mesh;
+    pub const Transform = @import("components/transform.zig").Transform;
 };
 
 pub const plugins = struct {

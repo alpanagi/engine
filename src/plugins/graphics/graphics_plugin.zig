@@ -11,6 +11,7 @@ const GPUMesh = @import("../../resources/materials/gpu_mesh.zig").GPUMesh;
 const Instance = @import("../../resources/materials/instance.zig").Instance;
 const Material = @import("../../resources/materials/material.zig").Material;
 const Materials = @import("../../resources/materials/materials.zig").Materials;
+const Transform = @import("../../components/transform.zig").Transform;
 
 const OnWindowDestroy = @import("../window_plugin.zig").OnWindowDestroy;
 const Window = @import("../window_plugin.zig").Window;
@@ -62,7 +63,9 @@ pub const GraphicsPlugin = struct {
         const device = self.device orelse return;
         const materials = world.getResource(Materials) orelse return;
 
-        const mesh = (world.getEntity(created.entity, &.{Mesh}) catch return)[0];
+        const entity = world.getEntity(created.entity, &.{ Mesh, Transform }) catch return;
+        const mesh = entity[0];
+        const transform = entity[1];
 
         const material_index = materials.find(mesh.material) orelse
             loadMaterial(device, allocator.*, world, materials, mesh.material) orelse return;
@@ -75,7 +78,7 @@ pub const GraphicsPlugin = struct {
 
         mesh.material_index = material_index;
         mesh.gpu_mesh_index = gpu_mesh_index;
-        mesh.instance_index = gpu_mesh.addInstance(device, Instance{ .location = .{ 0, 0, 0 } });
+        mesh.instance_index = gpu_mesh.addInstance(device, Instance{ .location = transform.location });
     }
 
     fn loadMaterial(
