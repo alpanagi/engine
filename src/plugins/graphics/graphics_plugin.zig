@@ -7,7 +7,6 @@ const util = @import("../../util.zig");
 
 const AssetLoader = @import("../../resources/asset_loader/asset_loader.zig").AssetLoader;
 const Mesh = @import("../../components/mesh.zig").Mesh;
-const GPUMesh = @import("../../resources/materials/gpu_mesh.zig").GPUMesh;
 const Instance = @import("../../resources/materials/instance.zig").Instance;
 const Material = @import("../../resources/materials/material.zig").Material;
 const Materials = @import("../../resources/materials/materials.zig").Materials;
@@ -101,20 +100,8 @@ pub const GraphicsPlugin = struct {
         defer allocator.free(shader_data);
 
         var reader = std.Io.Reader.fixed(shader_data);
-        var material = Material.init(device, &reader) catch {
+        const material = Material.init(device, &reader) catch {
             util.panic("Failed to create material: {s}\n", .{path});
-        };
-
-        const vertices = [_]f32{
-            0.0,  0.5,  0.0,
-            -0.5, -0.5, 0.0,
-            0.5,  -0.5, 0.0,
-        };
-        material.setVertices(device, &vertices);
-
-        const gpu_mesh = GPUMesh.init(device, 0, @intCast(vertices.len / 3));
-        material.gpu_meshes.append(allocator, gpu_mesh) catch {
-            util.panic("Out of memory for gpu mesh allocation.\n", .{});
         };
 
         const material_index: u32 = @intCast(materials.materials.items.len);

@@ -7,6 +7,9 @@ const util = @import("../../util.zig");
 const GPUBuffer = @import("gpu_buffer.zig").GPUBuffer;
 const GPUMesh = @import("gpu_mesh.zig").GPUMesh;
 
+const vertex_size: u32 = @sizeOf(f32) * 3;
+const initial_vertex_capacity: u32 = 1024;
+
 pub const Material = struct {
     pipeline: *sdl.SDL_GPUGraphicsPipeline,
     vertex_buffer: ?GPUBuffer = null,
@@ -32,7 +35,7 @@ pub const Material = struct {
 
         const vertexBufferDescription = sdl.SDL_GPUVertexBufferDescription{
             .slot = 0,
-            .pitch = @sizeOf(f32) * 3,
+            .pitch = vertex_size,
             .input_rate = sdl.SDL_GPU_VERTEXINPUTRATE_VERTEX,
         };
         const vertexAttribute = sdl.SDL_GPUVertexAttribute{
@@ -116,18 +119,33 @@ pub const Material = struct {
         sdl.SDL_ReleaseGPUGraphicsPipeline(device, self.pipeline);
     }
 
-    pub fn setVertices(self: *Material, device: *sdl.SDL_GPUDevice, vertices: []const f32) void {
-        const data = std.mem.sliceAsBytes(vertices);
-        const size: u32 = @intCast(data.len);
+    pub fn addVertices(self: *Material, device: *sdl.SDL_GPUDevice, vertices: []const f32) u32 {
         const count: u32 = @intCast(vertices.len / 3);
+        const offset = if (self.vertex_buffer) |buffer| buffer.count else 0;
+        if (count == 0) return offset;
 
-        const needsBuffer = if (self.vertex_buffer) |buffer| buffer.size != size else true;
-        if (needsBuffer) {
-            self.freeGpuBuffers(device);
-            self.vertex_buffer = GPUBuffer.init(device, sdl.SDL_GPU_BUFFERUSAGE_VERTEX, size);
+        self.ensureVertexCapacity(device, offset + count);
+        self.vertex_buffer.?.append(device, std.mem.sliceAsBytes(vertices), count);
+
+        return offset;
+    }
+
+    fn ensureVertexCapacity(self: *Material, device: *sdl.SDL_GPUDevice, count: u32) void {
+        if (self.vertex_buffer == null) {
+            self.vertex_buffer = GPUBuffer.init(
+                device,
+                sdl.SDL_GPU_BUFFERUSAGE_VERTEX,
+                initial_vertex_capacity * vertex_size,
+            );
         }
 
-        self.vertex_buffer.?.write(device, data, count);
+        const capacity = self.vertex_buffer.?.size / vertex_size;
+        if (count <= capacity) return;
+
+        var new_capacity: u32 = capacity;
+        while (new_capacity < count) new_capacity *= 2;
+
+        self.vertex_buffer.?.grow(device, new_capacity * vertex_size);
     }
 
     fn freeGpuBuffers(self: *Material, device: *sdl.SDL_GPUDevice) void {
