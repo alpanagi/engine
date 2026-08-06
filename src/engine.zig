@@ -8,6 +8,17 @@ pub const components = struct {
     pub const Transform = @import("components/transform.zig").Transform;
 };
 
+pub const data = struct {
+    pub const MeshData = @import("resources/mesh_data.zig").MeshData;
+};
+
+pub const events = struct {
+    pub const OnConfigLoaded = @import("plugins/config_plugin.zig").OnConfigLoaded;
+    pub const OnMeshRegister = @import("plugins/graphics/graphics_plugin.zig").OnMeshRegister;
+    pub const OnShutdown = struct {};
+    pub const OnWindowDestroy = @import("plugins/window_plugin.zig").OnWindowDestroy;
+};
+
 pub const plugins = struct {
     pub const ConfigPlugin = @import("plugins/config_plugin.zig").ConfigPlugin;
     pub const GraphicsPlugin = @import("plugins/graphics/graphics_plugin.zig").GraphicsPlugin;
@@ -25,10 +36,9 @@ pub const resources = struct {
 
 const AssetLoader = resources.AssetLoader;
 const Materials = resources.Materials;
+const OnShutdown = events.OnShutdown;
 const Time = resources.Time;
 const World = @import("ecs").World;
-
-pub const OnShutdown = struct {};
 
 pub const Engine = struct {
     world: World,

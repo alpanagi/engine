@@ -8,7 +8,7 @@ const AssetLoader = @import("../resources/asset_loader/asset_loader.zig").AssetL
 const Color = @import("../color.zig").Color;
 const Config = @import("../resources/config.zig").Config;
 const OnConfigLoaded = @import("config_plugin.zig").OnConfigLoaded;
-const OnShutdown = @import("../engine.zig").OnShutdown;
+const OnShutdown = @import("../engine.zig").events.OnShutdown;
 
 pub const OnWindowDestroy = struct {};
 
