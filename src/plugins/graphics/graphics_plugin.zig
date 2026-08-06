@@ -71,6 +71,11 @@ pub const GraphicsPlugin = struct {
     sdl_window: ?*sdl.SDL_Window = null,
     pending_meshes: std.ArrayList(PendingMesh) = .empty,
 
+    pub fn deinit(self: *GraphicsPlugin, alloc: std.mem.Allocator) void {
+        for (self.pending_meshes.items) |*pending| pending.deinit(alloc);
+        self.pending_meshes.deinit(alloc);
+    }
+
     pub fn build(
         self: *GraphicsPlugin,
         allocator: *const std.mem.Allocator,
@@ -78,9 +83,9 @@ pub const GraphicsPlugin = struct {
     ) !void {
         try world.addObserver(allocator.*, onWindowCreate, self);
         try world.addObserver(allocator.*, onWindowDestroy, self);
-        try world.addObserver(allocator.*, onMeshCreate, self);
         try world.addObserver(allocator.*, onMeshRegister, self);
         try world.addSystem(allocator.*, "post-update", uploadPendingMeshes, self);
+        try world.addSystem(allocator.*, "post-update", assignInstances, self);
         try world.addSystem(allocator.*, "post-update", uploadBuffers, self);
         try world.addSystem(allocator.*, "post-update", draw, self);
     }
@@ -152,31 +157,33 @@ pub const GraphicsPlugin = struct {
         self.pending_meshes.clearRetainingCapacity();
     }
 
-    pub fn onMeshCreate(
+    pub fn assignInstances(
         self: *GraphicsPlugin,
         allocator: *const std.mem.Allocator,
         world: *ecs.World,
-        created: *const ecs.Created(Mesh),
     ) void {
         const device = self.device orelse return;
         const materials = world.getResource(Materials) orelse return;
 
-        const entity = world.getEntity(created.entity, &.{ Mesh, Transform }) catch return;
-        const mesh = entity[0];
-        const transform = entity[1];
+        var query = world.query(&.{ Mesh, Transform });
+        while (query.next(world)) |entity| {
+            const mesh = entity[0];
+            const transform = entity[1];
 
-        const material_index = materials.find(mesh.material) orelse
-            loadMaterial(device, allocator.*, world, materials, mesh.material) orelse return;
+            if (mesh.instance_index != null) continue;
 
-        const material = &materials.materials.items[material_index];
-        if (material.gpu_meshes.items.len == 0) return;
+            const material_index = materials.find(mesh.material) orelse
+                loadMaterial(device, allocator.*, world, materials, mesh.material) orelse continue;
 
-        const gpu_mesh_index: u32 = 0;
-        const gpu_mesh = &material.gpu_meshes.items[gpu_mesh_index];
+            const material = &materials.materials.items[material_index];
 
-        mesh.material_index = material_index;
-        mesh.gpu_mesh_index = gpu_mesh_index;
-        mesh.instance_index = gpu_mesh.addInstance(device, Instance{ .location = transform.location });
+            const gpu_mesh_index = material.findGpuMesh(util.hashBytes(mesh.id)) orelse continue;
+            const gpu_mesh = &material.gpu_meshes.items[gpu_mesh_index];
+
+            mesh.material_index = material_index;
+            mesh.gpu_mesh_index = gpu_mesh_index;
+            mesh.instance_index = gpu_mesh.addInstance(device, Instance{ .location = transform.location });
+        }
     }
 
     fn loadMaterial(
