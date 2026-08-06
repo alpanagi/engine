@@ -7,17 +7,69 @@ const util = @import("../../util.zig");
 
 const AssetLoader = @import("../../resources/asset_loader/asset_loader.zig").AssetLoader;
 const Mesh = @import("../../components/mesh.zig").Mesh;
+const GPUMesh = @import("../../resources/materials/gpu_mesh.zig").GPUMesh;
 const Instance = @import("../../resources/materials/instance.zig").Instance;
 const Material = @import("../../resources/materials/material.zig").Material;
 const Materials = @import("../../resources/materials/materials.zig").Materials;
+const MeshData = @import("../../resources/mesh_data.zig").MeshData;
 const Transform = @import("../../components/transform.zig").Transform;
 
 const OnWindowDestroy = @import("../window_plugin.zig").OnWindowDestroy;
 const Window = @import("../window_plugin.zig").Window;
 
+pub const OnMeshRegister = struct {
+    id: u64,
+    material: []const u8,
+    data: *MeshData,
+
+    pub fn fromOwnedAlloc(
+        alloc: std.mem.Allocator,
+        id: []const u8,
+        material: []const u8,
+        data: *MeshData,
+    ) !OnMeshRegister {
+        return OnMeshRegister{
+            .id = util.hashBytes(id),
+            .material = try alloc.dupe(u8, material),
+            .data = data,
+        };
+    }
+
+    pub fn deinit(self: *OnMeshRegister, alloc: std.mem.Allocator) void {
+        alloc.free(self.material);
+        self.material = &.{};
+    }
+};
+
+const PendingMesh = struct {
+    id: u64,
+    material: []const u8,
+    data: MeshData,
+
+    fn init(alloc: std.mem.Allocator, event: *const OnMeshRegister) !PendingMesh {
+        const material = try alloc.dupe(u8, event.material);
+        errdefer alloc.free(material);
+
+        const data = event.data.*;
+        event.data.positions = &.{};
+
+        return PendingMesh{
+            .id = event.id,
+            .material = material,
+            .data = data,
+        };
+    }
+
+    fn deinit(self: *PendingMesh, alloc: std.mem.Allocator) void {
+        alloc.free(self.material);
+        self.data.deinit(alloc);
+    }
+};
+
 pub const GraphicsPlugin = struct {
     device: ?*sdl.SDL_GPUDevice = null,
     sdl_window: ?*sdl.SDL_Window = null,
+    pending_meshes: std.ArrayList(PendingMesh) = .empty,
 
     pub fn build(
         self: *GraphicsPlugin,
@@ -27,6 +79,8 @@ pub const GraphicsPlugin = struct {
         try world.addObserver(allocator.*, onWindowCreate, self);
         try world.addObserver(allocator.*, onWindowDestroy, self);
         try world.addObserver(allocator.*, onMeshCreate, self);
+        try world.addObserver(allocator.*, onMeshRegister, self);
+        try world.addSystem(allocator.*, "post-update", uploadPendingMeshes, self);
         try world.addSystem(allocator.*, "post-update", uploadBuffers, self);
         try world.addSystem(allocator.*, "post-update", draw, self);
     }
@@ -51,6 +105,51 @@ pub const GraphicsPlugin = struct {
 
         self.device = device;
         self.sdl_window = window.sdl_window;
+    }
+
+    pub fn onMeshRegister(
+        self: *GraphicsPlugin,
+        allocator: *const std.mem.Allocator,
+        _: *ecs.World,
+        event: *const OnMeshRegister,
+    ) void {
+        const pending = PendingMesh.init(allocator.*, event) catch {
+            util.panic("Out of memory for pending mesh registration.\n", .{});
+        };
+
+        self.pending_meshes.append(allocator.*, pending) catch {
+            util.panic("Out of memory for pending mesh registration.\n", .{});
+        };
+    }
+
+    pub fn uploadPendingMeshes(
+        self: *GraphicsPlugin,
+        allocator: *const std.mem.Allocator,
+        world: *ecs.World,
+    ) void {
+        if (self.pending_meshes.items.len == 0) return;
+
+        const device = self.device orelse return;
+        const materials = world.getResource(Materials) orelse return;
+
+        for (self.pending_meshes.items) |*pending| {
+            defer pending.deinit(allocator.*);
+
+            const material_index = materials.find(pending.material) orelse
+                loadMaterial(device, allocator.*, world, materials, pending.material) orelse continue;
+
+            const material = &materials.materials.items[material_index];
+            if (material.findGpuMesh(pending.id) != null) continue;
+
+            const vertex_offset = material.addVertices(device, pending.data.positions);
+            const gpu_mesh = GPUMesh.init(device, vertex_offset, pending.data.vertexCount());
+
+            _ = material.addGpuMesh(allocator.*, pending.id, gpu_mesh) catch {
+                util.panic("Out of memory for gpu mesh registration.\n", .{});
+            };
+        }
+
+        self.pending_meshes.clearRetainingCapacity();
     }
 
     pub fn onMeshCreate(

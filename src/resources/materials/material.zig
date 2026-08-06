@@ -14,6 +14,7 @@ pub const Material = struct {
     pipeline: *sdl.SDL_GPUGraphicsPipeline,
     vertex_buffer: ?GPUBuffer = null,
     gpu_meshes: std.ArrayList(GPUMesh) = .empty,
+    gpu_mesh_index_by_id: std.AutoHashMapUnmanaged(u64, u32) = .empty,
 
     pub fn init(device: *sdl.SDL_GPUDevice, reader: *std.Io.Reader) !Material {
         var buffer: [1024 * 1024]u8 = undefined;
@@ -109,7 +110,28 @@ pub const Material = struct {
     }
 
     pub fn deinit(self: *Material, alloc: std.mem.Allocator) void {
+        self.gpu_mesh_index_by_id.deinit(alloc);
         self.gpu_meshes.deinit(alloc);
+    }
+
+    pub fn addGpuMesh(
+        self: *Material,
+        alloc: std.mem.Allocator,
+        id: u64,
+        gpu_mesh: GPUMesh,
+    ) !u32 {
+        const index: u32 = @intCast(self.gpu_meshes.items.len);
+
+        try self.gpu_mesh_index_by_id.put(alloc, id, index);
+        errdefer _ = self.gpu_mesh_index_by_id.remove(id);
+
+        try self.gpu_meshes.append(alloc, gpu_mesh);
+
+        return index;
+    }
+
+    pub fn findGpuMesh(self: *const Material, id: u64) ?u32 {
+        return self.gpu_mesh_index_by_id.get(id);
     }
 
     pub fn sdlDeinit(self: *Material, device: *sdl.SDL_GPUDevice) void {
