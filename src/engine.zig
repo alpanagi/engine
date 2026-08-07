@@ -3,6 +3,10 @@ const std = @import("std");
 
 const util = @import("util.zig");
 
+pub const commands = struct {
+    pub const RegisterMesh = @import("plugins/graphics/graphics_plugin.zig").RegisterMesh;
+};
+
 pub const components = struct {
     pub const Mesh = @import("components/mesh.zig").Mesh;
     pub const Transform = @import("components/transform.zig").Transform;
@@ -13,16 +17,16 @@ pub const data = struct {
 };
 
 pub const events = struct {
-    pub const OnConfigLoaded = @import("plugins/config_plugin.zig").OnConfigLoaded;
-    pub const OnMeshRegister = @import("plugins/graphics/graphics_plugin.zig").OnMeshRegister;
-    pub const OnShutdown = struct {};
-    pub const OnWindowDestroy = @import("plugins/window_plugin.zig").OnWindowDestroy;
+    pub const Added = @import("ecs").events.Added;
+    pub const ConfigLoaded = @import("plugins/config_plugin.zig").ConfigLoaded;
+    pub const Destroying = @import("ecs").events.Destroying;
+    pub const ShuttingDown = struct {};
+    pub const WindowDestroying = @import("plugins/window_plugin.zig").WindowDestroying;
 };
 
-pub const plugins = struct {
+const plugins = struct {
     pub const ConfigPlugin = @import("plugins/config_plugin.zig").ConfigPlugin;
     pub const GraphicsPlugin = @import("plugins/graphics/graphics_plugin.zig").GraphicsPlugin;
-    pub const ModuleLoaderPlugin = @import("plugins/module_loader_plugin.zig").ModuleLoaderPlugin;
     pub const TimePlugin = @import("plugins/time_plugin.zig").TimePlugin;
     pub const WindowPlugin = @import("plugins/window_plugin.zig").WindowPlugin;
 };
@@ -35,14 +39,17 @@ pub const resources = struct {
 };
 
 const AssetLoader = resources.AssetLoader;
+const ConfigPlugin = plugins.ConfigPlugin;
+const GraphicsPlugin = plugins.GraphicsPlugin;
 const Materials = resources.Materials;
-const OnShutdown = events.OnShutdown;
+const ShuttingDown = events.ShuttingDown;
 const Time = resources.Time;
+const TimePlugin = plugins.TimePlugin;
+const WindowPlugin = plugins.WindowPlugin;
 const World = @import("ecs").World;
 
 pub const Engine = struct {
     world: World,
-
     hasReceivedTerminationRequest: bool = false,
 
     pub fn init(alloc: std.mem.Allocator, io: std.Io, working_directory: []const u8) !Engine {
@@ -51,6 +58,7 @@ pub const Engine = struct {
 
         var world = World.init();
         try addResources(&world, alloc, io, working_directory);
+        try addPlugins(&world, alloc);
 
         return Engine{
             .world = world,
@@ -72,6 +80,13 @@ pub const Engine = struct {
         try world.addResource(alloc, Materials, .{});
     }
 
+    fn addPlugins(world: *World, alloc: std.mem.Allocator) !void {
+        try world.addPlugin(alloc, TimePlugin);
+        try world.addPlugin(alloc, ConfigPlugin);
+        try world.addPlugin(alloc, GraphicsPlugin);
+        try world.addPlugin(alloc, WindowPlugin);
+    }
+
     pub fn deinit(self: *Engine, alloc: std.mem.Allocator) void {
         self.world.deinit(alloc);
         sdl.SDL_Quit();
@@ -87,9 +102,9 @@ pub const Engine = struct {
 
     fn onShutdown(
         self: *Engine,
-        _: *const std.mem.Allocator,
+        _: std.mem.Allocator,
         _: *World,
-        _: *const OnShutdown,
+        _: *const ShuttingDown,
     ) void {
         self.hasReceivedTerminationRequest = true;
     }

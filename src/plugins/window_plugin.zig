@@ -7,10 +7,10 @@ const util = @import("../util.zig");
 const AssetLoader = @import("../resources/asset_loader/asset_loader.zig").AssetLoader;
 const Color = @import("../color.zig").Color;
 const Config = @import("../resources/config.zig").Config;
-const OnConfigLoaded = @import("config_plugin.zig").OnConfigLoaded;
-const OnShutdown = @import("../engine.zig").events.OnShutdown;
+const ConfigLoaded = @import("config_plugin.zig").ConfigLoaded;
+const ShuttingDown = @import("../engine.zig").events.ShuttingDown;
 
-pub const OnWindowDestroy = struct {};
+pub const WindowDestroying = struct {};
 
 pub const Window = struct {
     sdl_window: *sdl.SDL_Window,
@@ -69,46 +69,44 @@ pub const WindowPlugin = struct {
 
     pub fn build(
         self: *WindowPlugin,
-        allocator: *const std.mem.Allocator,
+        allocator: std.mem.Allocator,
         world: *ecs.World,
     ) !void {
-        try world.addObserver(allocator.*, onConfigLoaded, self);
-        try world.addSystem(allocator.*, "update", readSDLWindowEvents, self);
+        try world.addObserver(allocator, onConfigLoaded, self);
+        try world.addSystem(allocator, "update", readSDLWindowEvents, self);
     }
 
     pub fn onConfigLoaded(
         _: *WindowPlugin,
-        allocator: *const std.mem.Allocator,
+        allocator: std.mem.Allocator,
         world: *ecs.World,
-        _: *const OnConfigLoaded,
-    ) void {
+        _: *const ConfigLoaded,
+    ) !void {
         const config = world.getResource(Config) orelse return;
 
         const clear_color = Color.fromHex(config.window.clear_color) catch Color{ .r = 0, .g = 0, .b = 0 };
 
         const icon = if (world.getResource(AssetLoader)) |asset_loader|
-            asset_loader.loadImage(allocator.*, config.window.icon) catch null
+            asset_loader.loadImage(allocator, config.window.icon) catch null
         else
             null;
 
-        var window = Window.init(
-            allocator.*,
+        var window = try Window.init(
+            allocator,
             config.window.title,
             clear_color,
             icon,
             1280,
             720,
-        ) catch return;
+        );
+        errdefer window.deinit(allocator);
 
-        world.spawn(allocator.*, .{window}) catch {
-            window.deinit(allocator.*);
-            return;
-        };
+        try world.spawn(allocator, .{window});
     }
 
     pub fn readSDLWindowEvents(
         _: *WindowPlugin,
-        allocator: *const std.mem.Allocator,
+        allocator: std.mem.Allocator,
         world: *ecs.World,
     ) void {
         var query = world.query(&.{Window});
@@ -119,8 +117,8 @@ pub const WindowPlugin = struct {
                 sdl.SDL_EVENT_QUIT,
                 sdl.SDL_EVENT_WINDOW_CLOSE_REQUESTED,
                 => {
-                    world.trigger(allocator.*, OnWindowDestroy{});
-                    world.trigger(allocator.*, OnShutdown{});
+                    world.trigger(allocator, WindowDestroying{});
+                    world.trigger(allocator, ShuttingDown{});
                     return;
                 },
                 else => {},
