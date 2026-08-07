@@ -49,15 +49,19 @@ const WindowPlugin = plugins.WindowPlugin;
 const World = @import("ecs").World;
 
 pub const Engine = struct {
+    pub const Options = struct {
+        working_directory: []const u8 = ".",
+    };
+
     world: World,
     hasReceivedTerminationRequest: bool = false,
 
-    pub fn init(alloc: std.mem.Allocator, io: std.Io, working_directory: []const u8) !Engine {
+    pub fn init(alloc: std.mem.Allocator, io: std.Io, options: Options) !Engine {
         if (!sdl.SDL_SetHint(sdl.SDL_HINT_RENDER_DRIVER, "vulkan")) util.sdlPanic();
         if (!sdl.SDL_Init(sdl.SDL_INIT_VIDEO)) util.sdlPanic();
 
         var world = World.init();
-        try addResources(&world, alloc, io, working_directory);
+        try addResources(&world, alloc, io, options);
         try addPlugins(&world, alloc);
 
         return Engine{
@@ -69,12 +73,12 @@ pub const Engine = struct {
         world: *World,
         alloc: std.mem.Allocator,
         io: std.Io,
-        working_directory: []const u8,
+        options: Options,
     ) !void {
         try world.addResource(
             alloc,
             AssetLoader,
-            try AssetLoader.init(alloc, io, working_directory),
+            try AssetLoader.init(alloc, io, options.working_directory),
         );
         try world.addResource(alloc, Time, Time.init(io));
         try world.addResource(alloc, Materials, .{});
