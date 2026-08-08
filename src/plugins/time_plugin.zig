@@ -12,11 +12,7 @@ pub const TimePlugin = struct {
         try world.addSystem(allocator, "pre-update", tick, self);
     }
 
-    pub fn tick(
-        _: *TimePlugin,
-        _: std.mem.Allocator,
-        world: *ecs.World,
-    ) void {
-        if (world.getResource(Time)) |time| time.tick();
+    pub fn tick(_: *TimePlugin, time: ecs.Resource(Time)) void {
+        time.value.tick();
     }
 };

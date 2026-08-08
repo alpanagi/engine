@@ -92,11 +92,10 @@ pub const GraphicsPlugin = struct {
 
     pub fn onWindowCreate(
         self: *GraphicsPlugin,
-        _: std.mem.Allocator,
         world: *ecs.World,
-        added: *const ecs.events.Added(Window),
+        added: ecs.Event(ecs.events.Added(Window)),
     ) !void {
-        const window = (try world.getEntity(added.entity, &.{Window}))[0];
+        const window = (try world.getEntity(added.value.entity, &.{Window}))[0];
 
         const device = sdl.SDL_CreateGPUDevice(
             sdl.SDL_GPU_SHADERFORMAT_SPIRV,
@@ -115,10 +114,9 @@ pub const GraphicsPlugin = struct {
     pub fn onMeshRegister(
         self: *GraphicsPlugin,
         allocator: std.mem.Allocator,
-        _: *ecs.World,
-        event: *const RegisterMesh,
+        event: ecs.Event(RegisterMesh),
     ) !void {
-        var pending = try PendingMesh.init(allocator, event);
+        var pending = try PendingMesh.init(allocator, event.value);
         errdefer pending.deinit(allocator);
 
         try self.pending_meshes.append(allocator, pending);
@@ -127,22 +125,22 @@ pub const GraphicsPlugin = struct {
     pub fn uploadPendingMeshes(
         self: *GraphicsPlugin,
         allocator: std.mem.Allocator,
-        world: *ecs.World,
+        materials: ecs.Resource(Materials),
+        asset_loader: ecs.Resource(AssetLoader),
     ) !void {
         if (self.pending_meshes.items.len == 0) return;
 
         const device = self.device orelse return;
-        const materials = world.getResource(Materials) orelse return;
 
         defer self.pending_meshes.clearRetainingCapacity();
 
         for (self.pending_meshes.items) |*pending| {
             defer pending.deinit(allocator);
 
-            const material_index = materials.find(pending.material) orelse
-                loadMaterial(device, allocator, world, materials, pending.material) orelse continue;
+            const material_index = materials.value.find(pending.material) orelse
+                loadMaterial(device, allocator, asset_loader.value, materials.value, pending.material) orelse continue;
 
-            const material = &materials.materials.items[material_index];
+            const material = &materials.value.materials.items[material_index];
             if (material.findGpuMesh(pending.id) != null) continue;
 
             const vertex_offset = material.addVertices(device, pending.data.positions);
@@ -155,22 +153,23 @@ pub const GraphicsPlugin = struct {
     pub fn assignInstances(
         self: *GraphicsPlugin,
         allocator: std.mem.Allocator,
-        world: *ecs.World,
+        materials: ecs.Resource(Materials),
+        asset_loader: ecs.Resource(AssetLoader),
+        meshes: ecs.Query(&.{ Mesh, Transform }),
     ) void {
         const device = self.device orelse return;
-        const materials = world.getResource(Materials) orelse return;
 
-        var query = world.query(&.{ Mesh, Transform });
-        while (query.next(world)) |entity| {
+        var it = meshes.iterator();
+        while (it.next()) |entity| {
             const mesh = entity[0];
             const transform = entity[1];
 
             if (mesh.instance_index != null) continue;
 
-            const material_index = materials.find(mesh.material) orelse
-                loadMaterial(device, allocator, world, materials, mesh.material) orelse continue;
+            const material_index = materials.value.find(mesh.material) orelse
+                loadMaterial(device, allocator, asset_loader.value, materials.value, mesh.material) orelse continue;
 
-            const material = &materials.materials.items[material_index];
+            const material = &materials.value.materials.items[material_index];
 
             const gpu_mesh_index = material.findGpuMesh(util.hashBytes(mesh.id)) orelse continue;
             const gpu_mesh = &material.gpu_meshes.items[gpu_mesh_index];
@@ -184,12 +183,10 @@ pub const GraphicsPlugin = struct {
     fn loadMaterial(
         device: *sdl.SDL_GPUDevice,
         allocator: std.mem.Allocator,
-        world: *ecs.World,
+        asset_loader: *AssetLoader,
         materials: *Materials,
         id: []const u8,
     ) ?u32 {
-        const asset_loader = world.getResource(AssetLoader) orelse return null;
-
         const path = std.fmt.allocPrint(allocator, "assets/shaders/{s}.spv", .{id}) catch {
             util.panic("Out of memory for shader path allocation.\n", .{});
         };
@@ -216,11 +213,11 @@ pub const GraphicsPlugin = struct {
     pub fn onWindowDestroy(
         self: *GraphicsPlugin,
         allocator: std.mem.Allocator,
-        world: *ecs.World,
-        _: *const WindowDestroying,
+        materials: ecs.Resource(Materials),
+        _: ecs.Event(WindowDestroying),
     ) void {
         if (self.device) |device| {
-            if (world.getResource(Materials)) |materials| materials.sdlDeinit(allocator, device);
+            materials.value.sdlDeinit(allocator, device);
 
             if (self.sdl_window) |window| sdl.SDL_ReleaseWindowFromGPUDevice(device, window);
             sdl.SDL_DestroyGPUDevice(device);
@@ -231,16 +228,14 @@ pub const GraphicsPlugin = struct {
 
     pub fn uploadBuffers(
         self: *GraphicsPlugin,
-        _: std.mem.Allocator,
-        world: *ecs.World,
+        materials: ecs.Resource(Materials),
     ) void {
         const device = self.device orelse return;
-        const materials = world.getResource(Materials) orelse return;
 
         var commandBuffer: ?*sdl.SDL_GPUCommandBuffer = null;
         var copyPass: ?*sdl.SDL_GPUCopyPass = null;
 
-        for (materials.materials.items) |*material| {
+        for (materials.value.materials.items) |*material| {
             if (material.vertex_buffer) |*buffer| {
                 if (!buffer.dirty) continue;
 
@@ -261,15 +256,13 @@ pub const GraphicsPlugin = struct {
 
     pub fn draw(
         self: *GraphicsPlugin,
-        _: std.mem.Allocator,
-        world: *ecs.World,
+        materials: ecs.Resource(Materials),
+        windows: ecs.Query(&.{Window}),
     ) void {
         if (self.device == null) return;
 
-        var query = world.query(&.{Window});
-        const window = (query.next(world) orelse return)[0];
-
-        const materials = world.getResource(Materials) orelse return;
+        var it = windows.iterator();
+        const window = (it.next() orelse return)[0];
 
         const commandBuffer = sdl.SDL_AcquireGPUCommandBuffer(self.device) orelse util.sdlPanic();
 
@@ -301,7 +294,7 @@ pub const GraphicsPlugin = struct {
             };
             const renderPass = sdl.SDL_BeginGPURenderPass(commandBuffer, &colorTargetInfo, 1, null);
 
-            for (materials.materials.items) |material| {
+            for (materials.value.materials.items) |material| {
                 const vertex_buffer = material.vertex_buffer orelse continue;
 
                 sdl.SDL_BindGPUGraphicsPipeline(renderPass, material.pipeline);

@@ -80,20 +80,17 @@ pub const WindowPlugin = struct {
         _: *WindowPlugin,
         allocator: std.mem.Allocator,
         world: *ecs.World,
-        _: *const ConfigLoaded,
+        config: ecs.Resource(Config),
+        asset_loader: ecs.Resource(AssetLoader),
+        _: ecs.Event(ConfigLoaded),
     ) !void {
-        const config = world.getResource(Config) orelse return;
+        const clear_color = Color.fromHex(config.value.window.clear_color) catch Color{ .r = 0, .g = 0, .b = 0 };
 
-        const clear_color = Color.fromHex(config.window.clear_color) catch Color{ .r = 0, .g = 0, .b = 0 };
-
-        const icon = if (world.getResource(AssetLoader)) |asset_loader|
-            asset_loader.loadImage(allocator, config.window.icon) catch null
-        else
-            null;
+        const icon = asset_loader.value.loadImage(allocator, config.value.window.icon) catch null;
 
         var window = try Window.init(
             allocator,
-            config.window.title,
+            config.value.window.title,
             clear_color,
             icon,
             1280,
@@ -108,9 +105,10 @@ pub const WindowPlugin = struct {
         _: *WindowPlugin,
         allocator: std.mem.Allocator,
         world: *ecs.World,
+        windows: ecs.Query(&.{Window}),
     ) void {
-        var query = world.query(&.{Window});
-        if (query.next(world) == null) return;
+        var it = windows.iterator();
+        if (it.next() == null) return;
 
         while (readSDLEvent()) |event| {
             switch (event.type) {

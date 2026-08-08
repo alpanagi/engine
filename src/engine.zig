@@ -40,6 +40,7 @@ pub const resources = struct {
 
 const AssetLoader = resources.AssetLoader;
 const ConfigPlugin = plugins.ConfigPlugin;
+const Event = @import("ecs").Event;
 const GraphicsPlugin = plugins.GraphicsPlugin;
 const Materials = resources.Materials;
 const ShuttingDown = events.ShuttingDown;
@@ -104,12 +105,7 @@ pub const Engine = struct {
         }
     }
 
-    fn onShutdown(
-        self: *Engine,
-        _: std.mem.Allocator,
-        _: *World,
-        _: *const ShuttingDown,
-    ) void {
+    fn onShutdown(self: *Engine, _: Event(ShuttingDown)) void {
         self.hasReceivedTerminationRequest = true;
     }
 

@@ -19,18 +19,15 @@ pub const ConfigPlugin = struct {
         _: *ConfigPlugin,
         allocator: std.mem.Allocator,
         world: *ecs.World,
+        asset_loader: ecs.Resource(AssetLoader),
     ) !void {
-        const config = try readConfig(allocator, world);
+        const config = try readConfig(allocator, asset_loader.value);
         try world.addResource(allocator, Config, config);
         world.trigger(allocator, ConfigLoaded{});
     }
 };
 
-fn readConfig(allocator: std.mem.Allocator, world: *ecs.World) !Config {
-    const asset_loader = world.getResource(AssetLoader) orelse {
-        return Config.default(allocator);
-    };
-
+fn readConfig(allocator: std.mem.Allocator, asset_loader: *AssetLoader) !Config {
     return asset_loader.readToml(allocator, Config, "project.toml") catch {
         return Config.default(allocator);
     };
