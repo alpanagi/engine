@@ -76,26 +76,22 @@ pub const GraphicsPlugin = struct {
         self.pending_meshes.deinit(alloc);
     }
 
-    pub fn build(
-        self: *GraphicsPlugin,
-        allocator: std.mem.Allocator,
-        world: *ecs.World,
-    ) !void {
-        try world.addObserver(allocator, onWindowCreate, self);
-        try world.addObserver(allocator, onWindowDestroy, self);
-        try world.addObserver(allocator, onMeshRegister, self);
-        try world.addSystem(allocator, "post-update", uploadPendingMeshes, self);
-        try world.addSystem(allocator, "post-update", assignInstances, self);
-        try world.addSystem(allocator, "post-update", uploadBuffers, self);
-        try world.addSystem(allocator, "post-update", draw, self);
+    pub fn build(self: *GraphicsPlugin, commands: ecs.Commands) !void {
+        try commands.addObserver(onWindowCreate, self);
+        try commands.addObserver(onWindowDestroy, self);
+        try commands.addObserver(onMeshRegister, self);
+        try commands.addSystem("post-update", uploadPendingMeshes, self);
+        try commands.addSystem("post-update", assignInstances, self);
+        try commands.addSystem("post-update", uploadBuffers, self);
+        try commands.addSystem("post-update", draw, self);
     }
 
     pub fn onWindowCreate(
         self: *GraphicsPlugin,
-        world: *ecs.World,
+        windows: ecs.Query(&.{Window}),
         added: ecs.Event(ecs.events.Added(Window)),
     ) !void {
-        const window = (try world.getEntity(added.value.entity, &.{Window}))[0];
+        const window = (try windows.get(added.value.entity))[0];
 
         const device = sdl.SDL_CreateGPUDevice(
             sdl.SDL_GPU_SHADERFORMAT_SPIRV,

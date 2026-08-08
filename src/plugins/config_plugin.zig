@@ -7,23 +7,23 @@ const Config = @import("../resources/config.zig").Config;
 pub const ConfigLoaded = struct {};
 
 pub const ConfigPlugin = struct {
-    pub fn build(
-        self: *ConfigPlugin,
-        allocator: std.mem.Allocator,
-        world: *ecs.World,
-    ) !void {
-        try world.addOneShotSystem(allocator, load, self);
+    pub fn build(self: *ConfigPlugin, commands: ecs.Commands) !void {
+        try commands.addOneShotSystem(load, self);
     }
 
     pub fn load(
-        _: *ConfigPlugin,
+        self: *ConfigPlugin,
         allocator: std.mem.Allocator,
-        world: *ecs.World,
+        commands: ecs.Commands,
         asset_loader: ecs.Resource(AssetLoader),
     ) !void {
         const config = try readConfig(allocator, asset_loader.value);
-        try world.addResource(allocator, Config, config);
-        world.trigger(allocator, ConfigLoaded{});
+        try commands.addResource(Config, config);
+        try commands.addOneShotSystem(announceConfigLoaded, self);
+    }
+
+    pub fn announceConfigLoaded(_: *ConfigPlugin, commands: ecs.Commands) void {
+        commands.trigger(ConfigLoaded{});
     }
 };
 

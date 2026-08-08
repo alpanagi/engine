@@ -1,4 +1,5 @@
 pub const commands = @import("engine.zig").commands;
+pub const Commands = @import("ecs").Commands;
 pub const components = @import("engine.zig").components;
 pub const data = @import("engine.zig").data;
 pub const Engine = @import("engine.zig").Engine;

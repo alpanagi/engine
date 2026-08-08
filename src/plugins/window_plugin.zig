@@ -67,19 +67,15 @@ pub const WindowPlugin = struct {
         if (self.icon) |icon| sdl.SDL_DestroySurface(icon);
     }
 
-    pub fn build(
-        self: *WindowPlugin,
-        allocator: std.mem.Allocator,
-        world: *ecs.World,
-    ) !void {
-        try world.addObserver(allocator, onConfigLoaded, self);
-        try world.addSystem(allocator, "update", readSDLWindowEvents, self);
+    pub fn build(self: *WindowPlugin, commands: ecs.Commands) !void {
+        try commands.addObserver(onConfigLoaded, self);
+        try commands.addSystem("update", readSDLWindowEvents, self);
     }
 
     pub fn onConfigLoaded(
         _: *WindowPlugin,
         allocator: std.mem.Allocator,
-        world: *ecs.World,
+        commands: ecs.Commands,
         config: ecs.Resource(Config),
         asset_loader: ecs.Resource(AssetLoader),
         _: ecs.Event(ConfigLoaded),
@@ -98,13 +94,12 @@ pub const WindowPlugin = struct {
         );
         errdefer window.deinit(allocator);
 
-        try world.spawn(allocator, .{window});
+        try commands.spawn(.{window});
     }
 
     pub fn readSDLWindowEvents(
         _: *WindowPlugin,
-        allocator: std.mem.Allocator,
-        world: *ecs.World,
+        commands: ecs.Commands,
         windows: ecs.Query(&.{Window}),
     ) void {
         var it = windows.iterator();
@@ -115,8 +110,8 @@ pub const WindowPlugin = struct {
                 sdl.SDL_EVENT_QUIT,
                 sdl.SDL_EVENT_WINDOW_CLOSE_REQUESTED,
                 => {
-                    world.trigger(allocator, WindowDestroying{});
-                    world.trigger(allocator, ShuttingDown{});
+                    commands.trigger(WindowDestroying{});
+                    commands.trigger(ShuttingDown{});
                     return;
                 },
                 else => {},
