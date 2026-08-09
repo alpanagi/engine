@@ -14,16 +14,27 @@ pub const LoadMesh = struct {
     material: []const u8,
     path: []const u8,
 
+    pub fn init(
+        allocator: std.mem.Allocator,
+        id: []const u8,
+        material: []const u8,
+        path: []const u8,
+    ) !LoadMesh {
+        const owned_id = try allocator.dupe(u8, id);
+        errdefer allocator.free(owned_id);
+
+        const owned_material = try allocator.dupe(u8, material);
+        errdefer allocator.free(owned_material);
+
+        return LoadMesh{
+            .id = owned_id,
+            .material = owned_material,
+            .path = try allocator.dupe(u8, path),
+        };
+    }
+
     fn dupe(self: *const LoadMesh, allocator: std.mem.Allocator) !LoadMesh {
-        const id = try allocator.dupe(u8, self.id);
-        errdefer allocator.free(id);
-
-        const material = try allocator.dupe(u8, self.material);
-        errdefer allocator.free(material);
-
-        const path = try allocator.dupe(u8, self.path);
-
-        return LoadMesh{ .id = id, .material = material, .path = path };
+        return init(allocator, self.id, self.material, self.path);
     }
 
     fn deinit(self: *LoadMesh, allocator: std.mem.Allocator) void {
