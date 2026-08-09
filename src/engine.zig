@@ -15,12 +15,14 @@ pub const data = struct {
 pub const events = struct {
     pub const component = @import("ecs").events.component;
     pub const resource = @import("ecs").events.resource;
+    pub const LoadMesh = @import("plugins/asset_plugin.zig").LoadMesh;
     pub const RegisterMesh = @import("plugins/graphics/graphics_plugin.zig").RegisterMesh;
     pub const ShuttingDown = struct {};
     pub const WindowDestroying = @import("plugins/window_plugin.zig").WindowDestroying;
 };
 
 const plugins = struct {
+    pub const AssetPlugin = @import("plugins/asset_plugin.zig").AssetPlugin;
     pub const ConfigPlugin = @import("plugins/config_plugin.zig").ConfigPlugin;
     pub const GraphicsPlugin = @import("plugins/graphics/graphics_plugin.zig").GraphicsPlugin;
     pub const TimePlugin = @import("plugins/time_plugin.zig").TimePlugin;
@@ -35,6 +37,7 @@ pub const resources = struct {
 };
 
 const AssetLoader = resources.AssetLoader;
+const AssetPlugin = plugins.AssetPlugin;
 const ConfigPlugin = plugins.ConfigPlugin;
 const Event = @import("ecs").Event;
 const GraphicsPlugin = plugins.GraphicsPlugin;
@@ -75,7 +78,9 @@ pub const Engine = struct {
         try world.addResource(
             alloc,
             AssetLoader,
-            try AssetLoader.init(alloc, io, options.working_directory),
+            try AssetLoader.init(alloc, io, .{
+                .working_directory = options.working_directory,
+            }),
         );
         try world.addResource(alloc, Time, Time.init(io));
         try world.addResource(alloc, Materials, .{});
@@ -84,6 +89,7 @@ pub const Engine = struct {
     fn addPlugins(world: *World, alloc: std.mem.Allocator) !void {
         try world.addPlugin(alloc, TimePlugin);
         try world.addPlugin(alloc, ConfigPlugin);
+        try world.addPlugin(alloc, AssetPlugin);
         try world.addPlugin(alloc, GraphicsPlugin);
         try world.addPlugin(alloc, WindowPlugin);
     }
