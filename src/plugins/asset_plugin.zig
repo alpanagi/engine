@@ -33,14 +33,14 @@ pub const LoadMesh = struct {
         };
     }
 
-    fn dupe(self: *const LoadMesh, allocator: std.mem.Allocator) !LoadMesh {
-        return init(allocator, self.id, self.material, self.path);
-    }
-
-    fn deinit(self: *LoadMesh, allocator: std.mem.Allocator) void {
+    pub fn deinit(self: *LoadMesh, allocator: std.mem.Allocator) void {
         allocator.free(self.id);
         allocator.free(self.material);
         allocator.free(self.path);
+    }
+
+    pub fn dupe(self: *const LoadMesh, allocator: std.mem.Allocator) !LoadMesh {
+        return init(allocator, self.id, self.material, self.path);
     }
 };
 
