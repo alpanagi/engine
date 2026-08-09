@@ -3,10 +3,6 @@ const std = @import("std");
 
 const util = @import("util.zig");
 
-pub const commands = struct {
-    pub const RegisterMesh = @import("plugins/graphics/graphics_plugin.zig").RegisterMesh;
-};
-
 pub const components = struct {
     pub const Mesh = @import("components/mesh.zig").Mesh;
     pub const Transform = @import("components/transform.zig").Transform;
@@ -19,6 +15,7 @@ pub const data = struct {
 pub const events = struct {
     pub const component = @import("ecs").events.component;
     pub const resource = @import("ecs").events.resource;
+    pub const RegisterMesh = @import("plugins/graphics/graphics_plugin.zig").RegisterMesh;
     pub const ShuttingDown = struct {};
     pub const WindowDestroying = @import("plugins/window_plugin.zig").WindowDestroying;
 };
