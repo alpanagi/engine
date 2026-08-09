@@ -89,7 +89,7 @@ pub const GraphicsPlugin = struct {
     pub fn onWindowCreate(
         self: *GraphicsPlugin,
         windows: ecs.Query(&.{Window}),
-        added: ecs.Event(ecs.events.Added(Window)),
+        added: ecs.Event(ecs.events.component.Added(Window)),
     ) !void {
         const window = (try windows.get(added.value.entity))[0];
 

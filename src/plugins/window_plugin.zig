@@ -7,7 +7,6 @@ const util = @import("../util.zig");
 const AssetLoader = @import("../resources/asset_loader/asset_loader.zig").AssetLoader;
 const Color = @import("../color.zig").Color;
 const Config = @import("../resources/config.zig").Config;
-const ConfigLoaded = @import("config_plugin.zig").ConfigLoaded;
 const ShuttingDown = @import("../engine.zig").events.ShuttingDown;
 
 pub const WindowDestroying = struct {};
@@ -68,17 +67,17 @@ pub const WindowPlugin = struct {
     }
 
     pub fn build(self: *WindowPlugin, commands: ecs.Commands) !void {
-        try commands.addObserver(onConfigLoaded, self);
+        try commands.addObserver(onConfigAdded, self);
         try commands.addSystem("update", readSDLWindowEvents, self);
     }
 
-    pub fn onConfigLoaded(
+    pub fn onConfigAdded(
         _: *WindowPlugin,
         allocator: std.mem.Allocator,
         commands: ecs.Commands,
         config: ecs.Resource(Config),
         asset_loader: ecs.Resource(AssetLoader),
-        _: ecs.Event(ConfigLoaded),
+        _: ecs.Event(ecs.events.resource.Added(Config)),
     ) !void {
         const clear_color = Color.fromHex(config.value.window.clear_color) catch Color{ .r = 0, .g = 0, .b = 0 };
 
@@ -99,7 +98,7 @@ pub const WindowPlugin = struct {
 
     pub fn readSDLWindowEvents(
         _: *WindowPlugin,
-        commands: ecs.Commands,
+        observers: ecs.Observers,
         windows: ecs.Query(&.{Window}),
     ) void {
         var it = windows.iterator();
@@ -110,15 +109,14 @@ pub const WindowPlugin = struct {
                 sdl.SDL_EVENT_QUIT,
                 sdl.SDL_EVENT_WINDOW_CLOSE_REQUESTED,
                 => {
-                    commands.trigger(WindowDestroying{});
-                    commands.trigger(ShuttingDown{});
+                    observers.trigger(WindowDestroying{});
+                    observers.trigger(ShuttingDown{});
                     return;
                 },
                 else => {},
             }
         }
     }
-
 };
 
 fn readSDLEvent() ?sdl.SDL_Event {

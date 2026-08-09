@@ -17,9 +17,8 @@ pub const data = struct {
 };
 
 pub const events = struct {
-    pub const Added = @import("ecs").events.Added;
-    pub const ConfigLoaded = @import("plugins/config_plugin.zig").ConfigLoaded;
-    pub const Destroying = @import("ecs").events.Destroying;
+    pub const component = @import("ecs").events.component;
+    pub const resource = @import("ecs").events.resource;
     pub const ShuttingDown = struct {};
     pub const WindowDestroying = @import("plugins/window_plugin.zig").WindowDestroying;
 };
