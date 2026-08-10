@@ -8,19 +8,19 @@
             .url = "git+https://github.com/alpanagi/toml.git#eadbb305f2670601630c7404887faa6c3b3870a9",
             .hash = "toml-0.0.0-yNlRTDPpAAC7fyA8eKvEQF6X2oud4c355zZbJWKwssyS",
         },
-        .shaders = .{
-            .path = "shaders",
-        },
         .ecs = .{
             .url = "git+https://github.com/alpanagi/ecs.git#5e00d004caf83309a85ed5782961036b072cdba2",
             .hash = "ecs-0.0.0-3WUiB0RLAwC8PrOk3jCJBlErU9H2-x11E5tnVptKIvs9",
+        },
+        .shaders = .{
+            .url = "https://github.com/alpanagi/engine/releases/download/shaders-v0.0.0/shaders-v0.0.0.tar.gz",
+            .hash = "shaders-0.0.0-OlY1r1YFAAB5bmVRqpRjJgP0iac9PPgDFghAr9ixOJg8",
         },
     },
     .paths = .{
         "build.zig",
         "build.zig.zon",
         "c",
-        "shaders",
         "src",
         "LICENSE",
         "README.md",
