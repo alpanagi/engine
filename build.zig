@@ -34,6 +34,10 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
     }).module("ecs");
 
+    const shaders = b.createModule(.{
+        .root_source_file = b.path("shaders/shaders.zig"),
+    });
+
     const engine_lib = b.addModule("engine", .{
         .root_source_file = b.path("src/lib.zig"),
         .target = target,
@@ -44,4 +48,5 @@ pub fn build(b: *std.Build) void {
     engine_lib.addImport("sdl_image", sdl_image);
     engine_lib.addImport("toml", toml);
     engine_lib.addImport("ecs", ecs);
+    engine_lib.addImport("shaders", shaders);
 }

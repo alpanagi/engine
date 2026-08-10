@@ -1,4 +1,5 @@
 const sdl = @import("sdl");
+const shaders = @import("shaders");
 const std = @import("std");
 
 const ecs = @import("ecs");
@@ -16,6 +17,30 @@ const Transform = @import("../../components/transform.zig").Transform;
 
 const Window = @import("../window_plugin.zig").Window;
 const WindowDestroying = @import("../window_plugin.zig").WindowDestroying;
+
+pub const LoadMaterial = struct {
+    id: []const u8,
+    path: []const u8,
+
+    pub fn init(
+        allocator: std.mem.Allocator,
+        id: []const u8,
+        path: []const u8,
+    ) !LoadMaterial {
+        const owned_id = try allocator.dupe(u8, id);
+        errdefer allocator.free(owned_id);
+
+        return LoadMaterial{
+            .id = owned_id,
+            .path = try allocator.dupe(u8, path),
+        };
+    }
+
+    pub fn deinit(self: *LoadMaterial, allocator: std.mem.Allocator) void {
+        allocator.free(self.id);
+        allocator.free(self.path);
+    }
+};
 
 pub const RegisterMesh = struct {
     id: u64,
@@ -79,6 +104,7 @@ pub const GraphicsPlugin = struct {
     pub fn build(self: *GraphicsPlugin, commands: ecs.Commands) !void {
         try commands.addObserver(onWindowCreate, self);
         try commands.addObserver(onWindowDestroy, self);
+        try commands.addObserver(onMaterialLoad, self);
         try commands.addObserver(onMeshRegister, self);
         try commands.addSystem("post-update", uploadPendingMeshes, self);
         try commands.addSystem("post-update", assignInstances, self);
@@ -88,6 +114,8 @@ pub const GraphicsPlugin = struct {
 
     pub fn onWindowCreate(
         self: *GraphicsPlugin,
+        allocator: std.mem.Allocator,
+        materials: ecs.Resource(Materials),
         windows: ecs.Query(&.{Window}),
         added: ecs.Event(ecs.events.component.Added(Window)),
     ) !void {
@@ -105,6 +133,23 @@ pub const GraphicsPlugin = struct {
 
         self.device = device;
         self.sdl_window = window.sdl_window;
+
+        try materials.value.add(allocator, "engine.diffuse", Material.init(device, shaders.diffuse));
+    }
+
+    pub fn onMaterialLoad(
+        self: *GraphicsPlugin,
+        allocator: std.mem.Allocator,
+        materials: ecs.Resource(Materials),
+        asset_loader: ecs.Resource(AssetLoader),
+        event: ecs.Event(LoadMaterial),
+    ) !void {
+        const device = self.device orelse return;
+
+        const shader_data = try asset_loader.value.readBinaryFileAlloc(allocator, event.value.path);
+        defer allocator.free(shader_data);
+
+        try materials.value.add(allocator, event.value.id, Material.init(device, shader_data));
     }
 
     pub fn onMeshRegister(
@@ -122,7 +167,6 @@ pub const GraphicsPlugin = struct {
         self: *GraphicsPlugin,
         allocator: std.mem.Allocator,
         materials: ecs.Resource(Materials),
-        asset_loader: ecs.Resource(AssetLoader),
     ) !void {
         if (self.pending_meshes.items.len == 0) return;
 
@@ -133,8 +177,7 @@ pub const GraphicsPlugin = struct {
         for (self.pending_meshes.items) |*pending| {
             defer pending.deinit(allocator);
 
-            const material_index = materials.value.find(pending.material) orelse
-                loadMaterial(device, allocator, asset_loader.value, materials.value, pending.material) orelse continue;
+            const material_index = materials.value.find(pending.material) orelse continue;
 
             const material = &materials.value.materials.items[material_index];
             if (material.findGpuMesh(pending.id) != null) continue;
@@ -148,9 +191,7 @@ pub const GraphicsPlugin = struct {
 
     pub fn assignInstances(
         self: *GraphicsPlugin,
-        allocator: std.mem.Allocator,
         materials: ecs.Resource(Materials),
-        asset_loader: ecs.Resource(AssetLoader),
         meshes: ecs.Query(&.{ Mesh, Transform }),
     ) void {
         const device = self.device orelse return;
@@ -162,8 +203,7 @@ pub const GraphicsPlugin = struct {
 
             if (mesh.instance_index != null) continue;
 
-            const material_index = materials.value.find(mesh.material) orelse
-                loadMaterial(device, allocator, asset_loader.value, materials.value, mesh.material) orelse continue;
+            const material_index = materials.value.find(mesh.material) orelse continue;
 
             const material = &materials.value.materials.items[material_index];
 
@@ -174,36 +214,6 @@ pub const GraphicsPlugin = struct {
             mesh.gpu_mesh_index = gpu_mesh_index;
             mesh.instance_index = gpu_mesh.addInstance(device, Instance{ .position = transform.position });
         }
-    }
-
-    fn loadMaterial(
-        device: *sdl.SDL_GPUDevice,
-        allocator: std.mem.Allocator,
-        asset_loader: *AssetLoader,
-        materials: *Materials,
-        id: []const u8,
-    ) ?u32 {
-        const path = std.fmt.allocPrint(allocator, "assets/shaders/{s}.spv", .{id}) catch {
-            util.panic("Out of memory for shader path allocation.\n", .{});
-        };
-        defer allocator.free(path);
-
-        const shader_data = asset_loader.readBinaryFileAlloc(allocator, path) catch {
-            util.panic("Failed to read shader: {s}\n", .{path});
-        };
-        defer allocator.free(shader_data);
-
-        var reader = std.Io.Reader.fixed(shader_data);
-        const material = Material.init(device, &reader) catch {
-            util.panic("Failed to create material: {s}\n", .{path});
-        };
-
-        const material_index: u32 = @intCast(materials.materials.items.len);
-        materials.add(allocator, id, material) catch {
-            util.panic("Out of memory for material allocation.\n", .{});
-        };
-
-        return material_index;
     }
 
     pub fn onWindowDestroy(

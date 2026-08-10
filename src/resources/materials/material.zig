@@ -16,11 +16,7 @@ pub const Material = struct {
     gpu_meshes: std.ArrayList(GPUMesh) = .empty,
     gpu_mesh_index_by_id: std.AutoHashMapUnmanaged(u64, u32) = .empty,
 
-    pub fn init(device: *sdl.SDL_GPUDevice, reader: *std.Io.Reader) !Material {
-        var buffer: [1024 * 1024]u8 = undefined;
-        const bufferLen = try reader.readSliceShort(&buffer);
-        const shaderData = buffer[0..bufferLen];
-
+    pub fn init(device: *sdl.SDL_GPUDevice, shaderData: []const u8) Material {
         const vertexShader = createShader(
             device,
             sdl.SDL_GPU_SHADERSTAGE_VERTEX,
@@ -182,7 +178,7 @@ fn createShader(
     device: *sdl.SDL_GPUDevice,
     shaderStage: sdl.SDL_GPUShaderStage,
     entrypoint: []const u8,
-    shaderData: []u8,
+    shaderData: []const u8,
 ) *sdl.SDL_GPUShader {
     const shaderCreateInfo = sdl.SDL_GPUShaderCreateInfo{
         .code_size = shaderData.len,

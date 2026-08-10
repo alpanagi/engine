@@ -15,6 +15,7 @@ pub const data = struct {
 pub const events = struct {
     pub const component = @import("ecs").events.component;
     pub const resource = @import("ecs").events.resource;
+    pub const LoadMaterial = @import("plugins/graphics/graphics_plugin.zig").LoadMaterial;
     pub const LoadMesh = @import("plugins/asset_plugin.zig").LoadMesh;
     pub const RegisterMesh = @import("plugins/graphics/graphics_plugin.zig").RegisterMesh;
     pub const ShuttingDown = struct {};

@@ -17,6 +17,7 @@
         "build.zig",
         "build.zig.zon",
         "c",
+        "shaders",
         "src",
         "LICENSE",
         "README.md",
