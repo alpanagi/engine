@@ -1,0 +1,7 @@
+.{
+    .name = .engine_shaders,
+    .version = "0.0.0",
+    .fingerprint = 0xbc773904420dd2e5,
+    .minimum_zig_version = "0.16.0",
+    .paths = .{""},
+}

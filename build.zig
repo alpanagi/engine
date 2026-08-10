@@ -34,9 +34,7 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
     }).module("ecs");
 
-    const shaders = b.createModule(.{
-        .root_source_file = b.path("shaders/shaders.zig"),
-    });
+    const shaders = b.dependency("shaders", .{}).module("shaders");
 
     const engine_lib = b.addModule("engine", .{
         .root_source_file = b.path("src/lib.zig"),
