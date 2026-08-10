@@ -5,6 +5,7 @@ pub const Engine = @import("engine.zig").Engine;
 pub const Entity = @import("ecs").Entity;
 pub const Event = @import("ecs").Event;
 pub const events = @import("engine.zig").events;
+pub const math = @import("math.zig");
 pub const Observers = @import("ecs").Observers;
 pub const Query = @import("ecs").Query;
 pub const Resource = @import("ecs").Resource;

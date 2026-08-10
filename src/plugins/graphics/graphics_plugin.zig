@@ -172,7 +172,7 @@ pub const GraphicsPlugin = struct {
 
             mesh.material_index = material_index;
             mesh.gpu_mesh_index = gpu_mesh_index;
-            mesh.instance_index = gpu_mesh.addInstance(device, Instance{ .location = transform.location });
+            mesh.instance_index = gpu_mesh.addInstance(device, Instance{ .position = transform.position });
         }
     }
 
@@ -228,26 +228,21 @@ pub const GraphicsPlugin = struct {
     ) void {
         const device = self.device orelse return;
 
-        var commandBuffer: ?*sdl.SDL_GPUCommandBuffer = null;
-        var copyPass: ?*sdl.SDL_GPUCopyPass = null;
+        const commandBuffer = sdl.SDL_AcquireGPUCommandBuffer(device) orelse util.sdlPanic();
+        const copyPass = sdl.SDL_BeginGPUCopyPass(commandBuffer) orelse util.sdlPanic();
 
         for (materials.value.materials.items) |*material| {
             if (material.vertex_buffer) |*buffer| {
-                if (!buffer.dirty) continue;
+                if (buffer.dirty) buffer.upload(copyPass);
+            }
 
-                if (copyPass == null) {
-                    commandBuffer = sdl.SDL_AcquireGPUCommandBuffer(device) orelse util.sdlPanic();
-                    copyPass = sdl.SDL_BeginGPUCopyPass(commandBuffer.?) orelse util.sdlPanic();
-                }
-
-                buffer.upload(copyPass.?);
+            for (material.gpu_meshes.items) |*gpu_mesh| {
+                if (gpu_mesh.instance_buffer.dirty) gpu_mesh.instance_buffer.upload(copyPass);
             }
         }
 
-        if (copyPass) |pass| {
-            sdl.SDL_EndGPUCopyPass(pass);
-            if (!sdl.SDL_SubmitGPUCommandBuffer(commandBuffer.?)) util.sdlPanic();
-        }
+        sdl.SDL_EndGPUCopyPass(copyPass);
+        if (!sdl.SDL_SubmitGPUCommandBuffer(commandBuffer)) util.sdlPanic();
     }
 
     pub fn draw(
@@ -302,6 +297,9 @@ pub const GraphicsPlugin = struct {
                 sdl.SDL_BindGPUVertexBuffers(renderPass, 0, &binding, 1);
 
                 for (material.gpu_meshes.items) |gpu_mesh| {
+                    const instance_buffer: *sdl.SDL_GPUBuffer = gpu_mesh.instance_buffer.buffer;
+                    sdl.SDL_BindGPUVertexStorageBuffers(renderPass, 0, &instance_buffer, 1);
+
                     sdl.SDL_DrawGPUPrimitives(
                         renderPass,
                         gpu_mesh.vertex_count,
