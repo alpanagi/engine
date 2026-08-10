@@ -5,11 +5,18 @@ const util = @import("../../util.zig");
 
 const Material = @import("material.zig").Material;
 
+pub const MeshLocation = struct {
+    material: u32,
+    gpu_mesh: u32,
+};
+
 pub const Materials = struct {
     materials: std.ArrayList(Material) = .empty,
     index_by_id: std.AutoHashMapUnmanaged(u64, u32) = .empty,
+    mesh_location_by_id: std.AutoHashMapUnmanaged(u64, MeshLocation) = .empty,
 
     pub fn deinit(self: *Materials, alloc: std.mem.Allocator) void {
+        self.mesh_location_by_id.deinit(alloc);
         self.index_by_id.deinit(alloc);
 
         for (self.materials.items) |*material| material.deinit(alloc);
@@ -22,6 +29,7 @@ pub const Materials = struct {
             material.deinit(alloc);
         }
 
+        self.mesh_location_by_id.clearRetainingCapacity();
         self.index_by_id.clearRetainingCapacity();
         self.materials.clearRetainingCapacity();
     }

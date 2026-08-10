@@ -7,7 +7,7 @@ const ecs = @import("ecs");
 const util = @import("../../util.zig");
 
 const AssetLoader = @import("../../resources/asset_loader/asset_loader.zig").AssetLoader;
-const Mesh = @import("../../components/mesh.zig").Mesh;
+const MeshInstance = @import("../../components/mesh_instance.zig").MeshInstance;
 const GPUMesh = @import("../../resources/materials/gpu_mesh.zig").GPUMesh;
 const Instance = @import("../../resources/materials/instance.zig").Instance;
 const Material = @import("../../resources/materials/material.zig").Material;
@@ -185,14 +185,19 @@ pub const GraphicsPlugin = struct {
             const vertex_offset = material.addVertices(device, pending.data.positions);
             const gpu_mesh = GPUMesh.init(device, vertex_offset, pending.data.vertexCount());
 
-            _ = try material.addGpuMesh(allocator, pending.id, gpu_mesh);
+            const gpu_mesh_index = try material.addGpuMesh(allocator, pending.id, gpu_mesh);
+
+            try materials.value.mesh_location_by_id.put(allocator, pending.id, .{
+                .material = material_index,
+                .gpu_mesh = gpu_mesh_index,
+            });
         }
     }
 
     pub fn assignInstances(
         self: *GraphicsPlugin,
         materials: ecs.Resource(Materials),
-        meshes: ecs.Query(&.{ Mesh, Transform }),
+        meshes: ecs.Query(&.{ MeshInstance, Transform }),
     ) void {
         const device = self.device orelse return;
 
@@ -203,15 +208,11 @@ pub const GraphicsPlugin = struct {
 
             if (mesh.instance_index != null) continue;
 
-            const material_index = materials.value.find(mesh.material) orelse continue;
+            const location = materials.value.mesh_location_by_id.get(util.hashBytes(mesh.id)) orelse continue;
 
-            const material = &materials.value.materials.items[material_index];
+            const material = &materials.value.materials.items[location.material];
+            const gpu_mesh = &material.gpu_meshes.items[location.gpu_mesh];
 
-            const gpu_mesh_index = material.findGpuMesh(util.hashBytes(mesh.id)) orelse continue;
-            const gpu_mesh = &material.gpu_meshes.items[gpu_mesh_index];
-
-            mesh.material_index = material_index;
-            mesh.gpu_mesh_index = gpu_mesh_index;
             mesh.instance_index = gpu_mesh.addInstance(device, Instance{ .position = transform.position });
         }
     }
