@@ -189,7 +189,7 @@ fn createShader(
         .num_samplers = 0,
         .num_storage_textures = 0,
         .num_storage_buffers = if (shaderStage == sdl.SDL_GPU_SHADERSTAGE_VERTEX) 1 else 0,
-        .num_uniform_buffers = 0,
+        .num_uniform_buffers = if (shaderStage == sdl.SDL_GPU_SHADERSTAGE_VERTEX) 1 else 0,
 
         .props = 0,
     };

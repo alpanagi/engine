@@ -6,7 +6,11 @@ const ecs = @import("ecs");
 
 const util = @import("../../util.zig");
 
+const mat4 = @import("../../math/mat4.zig");
+
+const Active = @import("../../components/active.zig").Active;
 const AssetLoader = @import("../../resources/asset_loader/asset_loader.zig").AssetLoader;
+const Camera = @import("../../components/camera.zig").Camera;
 const MeshInstance = @import("../../components/mesh_instance.zig").MeshInstance;
 const GPUMesh = @import("../../resources/materials/gpu_mesh.zig").GPUMesh;
 const Instance = @import("../../resources/materials/instance.zig").Instance;
@@ -260,6 +264,7 @@ pub const GraphicsPlugin = struct {
         self: *GraphicsPlugin,
         materials: ecs.Resource(Materials),
         windows: ecs.Query(&.{Window}),
+        cameras: ecs.Query(&.{ Camera, Transform, Active }),
     ) void {
         if (self.device == null) return;
 
@@ -282,6 +287,26 @@ pub const GraphicsPlugin = struct {
         }
 
         if (swapchainTexture) |texture| {
+            const aspect = @as(f32, @floatFromInt(swapchainTextureWidth)) /
+                @as(f32, @floatFromInt(swapchainTextureHeight));
+
+            const view_projection = if (cameras.first()) |entity| blk: {
+                const camera = entity[0];
+                const transform = entity[1];
+
+                break :blk mat4.mul(
+                    mat4.perspective(camera.fov_y, aspect, camera.near, camera.far),
+                    mat4.viewFromTransform(transform.position, transform.rotation),
+                );
+            } else mat4.identity;
+
+            sdl.SDL_PushGPUVertexUniformData(
+                commandBuffer,
+                0,
+                &view_projection,
+                @sizeOf(mat4.Mat4),
+            );
+
             const colorTargetInfo = sdl.SDL_GPUColorTargetInfo{
                 .texture = texture,
                 .clear_color = sdl.SDL_FColor{

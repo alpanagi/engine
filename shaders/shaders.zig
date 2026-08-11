@@ -1,1 +1,0 @@
-pub const diffuse = @embedFile("diffuse.spv");

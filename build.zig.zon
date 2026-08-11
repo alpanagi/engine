@@ -9,12 +9,12 @@
             .hash = "toml-0.0.0-yNlRTDPpAAC7fyA8eKvEQF6X2oud4c355zZbJWKwssyS",
         },
         .ecs = .{
-            .url = "git+https://github.com/alpanagi/ecs.git#5e00d004caf83309a85ed5782961036b072cdba2",
-            .hash = "ecs-0.0.0-3WUiB0RLAwC8PrOk3jCJBlErU9H2-x11E5tnVptKIvs9",
+            .url = "git+https://github.com/alpanagi/ecs.git#3567eeb887f574d89a74d77980cf3ef8cce39f35",
+            .hash = "ecs-0.0.0-3WUiB8KDAwDLQ1j2o6EhORhrYlcPCs_Jok-NZU61Ngb8",
         },
         .shaders = .{
-            .url = "https://github.com/alpanagi/engine/releases/download/shaders-v0.0.0/shaders-v0.0.0.tar.gz",
-            .hash = "shaders-0.0.0-OlY1r1YFAAB5bmVRqpRjJgP0iac9PPgDFghAr9ixOJg8",
+            .url = "https://github.com/alpanagi/shaders/releases/download/v0.0.0/shaders-v0.0.0.tar.gz",
+            .hash = "shaders-0.0.0-OlY1ry-QAAB1E4duQVx90HZSh6unv98dWPzavwlwgryN",
         },
     },
     .paths = .{

@@ -4,6 +4,8 @@ const std = @import("std");
 const util = @import("util.zig");
 
 pub const components = struct {
+    pub const Active = @import("components/active.zig").Active;
+    pub const Camera = @import("components/camera.zig").Camera;
     pub const MeshInstance = @import("components/mesh_instance.zig").MeshInstance;
     pub const Transform = @import("components/transform.zig").Transform;
 };
