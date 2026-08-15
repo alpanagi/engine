@@ -1,7 +1,5 @@
-const builtin = @import("builtin");
 const sdl = @import("sdl");
 const std = @import("std");
-
 const util = @import("../../util.zig");
 
 const GPUBuffer = @import("gpu_buffer.zig").GPUBuffer;
@@ -14,57 +12,63 @@ pub const Material = struct {
     pipeline: *sdl.SDL_GPUGraphicsPipeline,
     vertex_buffer: ?GPUBuffer = null,
     gpu_meshes: std.ArrayList(GPUMesh) = .empty,
-    gpu_mesh_index_by_id: std.AutoHashMapUnmanaged(u64, u32) = .empty,
 
-    pub fn init(device: *sdl.SDL_GPUDevice, shaderData: []const u8) Material {
-        const vertexShader = createShader(
+    pub fn init(
+        device: *sdl.SDL_GPUDevice,
+        swapchain_format: sdl.SDL_GPUTextureFormat,
+        shader_data: []const u8,
+    ) Material {
+        const vertex_shader = createShader(
             device,
             sdl.SDL_GPU_SHADERSTAGE_VERTEX,
             "vertex",
-            shaderData,
+            shader_data,
         );
-        const fragmentShader = createShader(
+        defer sdl.SDL_ReleaseGPUShader(device, vertex_shader);
+
+        const fragment_shader = createShader(
             device,
             sdl.SDL_GPU_SHADERSTAGE_FRAGMENT,
             "fragment",
-            shaderData,
+            shader_data,
         );
+        defer sdl.SDL_ReleaseGPUShader(device, fragment_shader);
 
-        const vertexBufferDescription = sdl.SDL_GPUVertexBufferDescription{
+        const vertex_buffer_description = sdl.SDL_GPUVertexBufferDescription{
             .slot = 0,
             .pitch = vertex_size,
             .input_rate = sdl.SDL_GPU_VERTEXINPUTRATE_VERTEX,
         };
-        const vertexAttribute = sdl.SDL_GPUVertexAttribute{
+        const vertex_attribute = sdl.SDL_GPUVertexAttribute{
             .location = 0,
             .buffer_slot = 0,
             .format = sdl.SDL_GPU_VERTEXELEMENTFORMAT_FLOAT3,
         };
-        const vertexInputState = sdl.SDL_GPUVertexInputState{
-            .vertex_buffer_descriptions = &vertexBufferDescription,
+        const vertex_input_state = sdl.SDL_GPUVertexInputState{
+            .vertex_buffer_descriptions = &vertex_buffer_description,
             .num_vertex_buffers = 1,
-            .vertex_attributes = &vertexAttribute,
+            .vertex_attributes = &vertex_attribute,
             .num_vertex_attributes = 1,
         };
-        const rasterizerState = sdl.SDL_GPURasterizerState{
+        const rasterizer_state = sdl.SDL_GPURasterizerState{
             .fill_mode = sdl.SDL_GPU_FILLMODE_FILL,
             .cull_mode = sdl.SDL_GPU_CULLMODE_BACK,
             .front_face = sdl.SDL_GPU_FRONTFACE_COUNTER_CLOCKWISE,
             .enable_depth_bias = false,
             .enable_depth_clip = false,
         };
-        const mutisampleState = sdl.SDL_GPUMultisampleState{
+        const multisample_state = sdl.SDL_GPUMultisampleState{
             .sample_count = sdl.SDL_GPU_SAMPLECOUNT_1,
             .enable_alpha_to_coverage = false,
         };
-        const depthStencilState = sdl.SDL_GPUDepthStencilState{
+        const depth_stencil_state = sdl.SDL_GPUDepthStencilState{
             .compare_op = sdl.SDL_GPU_COMPAREOP_LESS,
             .enable_depth_test = false,
             .enable_depth_write = false,
             .compare_mask = 0,
             .enable_stencil_test = false,
         };
-        const targetBlendState = sdl.SDL_GPUColorTargetBlendState{
+        const target_blend_state = sdl.SDL_GPUColorTargetBlendState{
             .src_color_blendfactor = sdl.SDL_GPU_BLENDFACTOR_ONE,
             .dst_color_blendfactor = sdl.SDL_GPU_BLENDFACTOR_ZERO,
             .color_blend_op = sdl.SDL_GPU_BLENDOP_ADD,
@@ -75,59 +79,34 @@ pub const Material = struct {
             .enable_blend = false,
             .enable_color_write_mask = false,
         };
-        const targetDescription = sdl.SDL_GPUColorTargetDescription{
-            .format = sdl.SDL_GPU_TEXTUREFORMAT_R8G8B8A8_UNORM,
-            .blend_state = targetBlendState,
+        const target_description = sdl.SDL_GPUColorTargetDescription{
+            .format = swapchain_format,
+            .blend_state = target_blend_state,
         };
-        const targetInfo = sdl.SDL_GPUGraphicsPipelineTargetInfo{
+        const target_info = sdl.SDL_GPUGraphicsPipelineTargetInfo{
             .num_color_targets = 1,
-            .color_target_descriptions = &targetDescription,
+            .color_target_descriptions = &target_description,
             .has_depth_stencil_target = false,
         };
-        const pipelineCreateInfo = sdl.SDL_GPUGraphicsPipelineCreateInfo{
-            .vertex_shader = vertexShader,
-            .fragment_shader = fragmentShader,
-            .vertex_input_state = vertexInputState,
+        const pipeline_create_info = sdl.SDL_GPUGraphicsPipelineCreateInfo{
+            .vertex_shader = vertex_shader,
+            .fragment_shader = fragment_shader,
+            .vertex_input_state = vertex_input_state,
             .primitive_type = sdl.SDL_GPU_PRIMITIVETYPE_TRIANGLELIST,
-            .rasterizer_state = rasterizerState,
-            .multisample_state = mutisampleState,
-            .depth_stencil_state = depthStencilState,
-            .target_info = targetInfo,
+            .rasterizer_state = rasterizer_state,
+            .multisample_state = multisample_state,
+            .depth_stencil_state = depth_stencil_state,
+            .target_info = target_info,
             .props = 0,
         };
 
-        const pipeline = sdl.SDL_CreateGPUGraphicsPipeline(device, &pipelineCreateInfo) orelse {
+        const pipeline = sdl.SDL_CreateGPUGraphicsPipeline(device, &pipeline_create_info) orelse {
             util.sdlPanic();
         };
 
         return Material{
             .pipeline = pipeline,
         };
-    }
-
-    pub fn deinit(self: *Material, alloc: std.mem.Allocator) void {
-        self.gpu_mesh_index_by_id.deinit(alloc);
-        self.gpu_meshes.deinit(alloc);
-    }
-
-    pub fn addGpuMesh(
-        self: *Material,
-        alloc: std.mem.Allocator,
-        id: u64,
-        gpu_mesh: GPUMesh,
-    ) !u32 {
-        const index: u32 = @intCast(self.gpu_meshes.items.len);
-
-        try self.gpu_mesh_index_by_id.put(alloc, id, index);
-        errdefer _ = self.gpu_mesh_index_by_id.remove(id);
-
-        try self.gpu_meshes.append(alloc, gpu_mesh);
-
-        return index;
-    }
-
-    pub fn findGpuMesh(self: *const Material, id: u64) ?u32 {
-        return self.gpu_mesh_index_by_id.get(id);
     }
 
     pub fn sdlDeinit(self: *Material, device: *sdl.SDL_GPUDevice) void {
@@ -137,8 +116,20 @@ pub const Material = struct {
         sdl.SDL_ReleaseGPUGraphicsPipeline(device, self.pipeline);
     }
 
-    pub fn addVertices(self: *Material, device: *sdl.SDL_GPUDevice, vertices: []const f32) u32 {
-        const count: u32 = @intCast(vertices.len / 3);
+    pub fn deinit(self: *Material, allocator: std.mem.Allocator) void {
+        self.gpu_meshes.deinit(allocator);
+    }
+
+    pub fn addGpuMesh(self: *Material, allocator: std.mem.Allocator, gpu_mesh: GPUMesh) u32 {
+        const index: u32 = @intCast(self.gpu_meshes.items.len);
+
+        self.gpu_meshes.append(allocator, gpu_mesh) catch util.panicOom("Material.addGpuMesh");
+
+        return index;
+    }
+
+    pub fn addVertices(self: *Material, device: *sdl.SDL_GPUDevice, vertices: []const [3]f32) u32 {
+        const count: u32 = @intCast(vertices.len);
         const offset = if (self.vertex_buffer) |buffer| buffer.count else 0;
         if (count == 0) return offset;
 
@@ -176,23 +167,23 @@ pub const Material = struct {
 
 fn createShader(
     device: *sdl.SDL_GPUDevice,
-    shaderStage: sdl.SDL_GPUShaderStage,
-    entrypoint: []const u8,
-    shaderData: []const u8,
+    shader_stage: sdl.SDL_GPUShaderStage,
+    entrypoint: [:0]const u8,
+    shader_data: []const u8,
 ) *sdl.SDL_GPUShader {
-    const shaderCreateInfo = sdl.SDL_GPUShaderCreateInfo{
-        .code_size = shaderData.len,
-        .code = shaderData.ptr,
+    const shader_create_info = sdl.SDL_GPUShaderCreateInfo{
+        .code_size = shader_data.len,
+        .code = shader_data.ptr,
         .entrypoint = entrypoint.ptr,
         .format = sdl.SDL_GPU_SHADERFORMAT_SPIRV,
-        .stage = shaderStage,
+        .stage = shader_stage,
         .num_samplers = 0,
         .num_storage_textures = 0,
-        .num_storage_buffers = if (shaderStage == sdl.SDL_GPU_SHADERSTAGE_VERTEX) 1 else 0,
-        .num_uniform_buffers = if (shaderStage == sdl.SDL_GPU_SHADERSTAGE_VERTEX) 1 else 0,
+        .num_storage_buffers = if (shader_stage == sdl.SDL_GPU_SHADERSTAGE_VERTEX) 1 else 0,
+        .num_uniform_buffers = if (shader_stage == sdl.SDL_GPU_SHADERSTAGE_VERTEX) 1 else 0,
 
         .props = 0,
     };
 
-    return sdl.SDL_CreateGPUShader(device, &shaderCreateInfo) orelse util.sdlPanic();
+    return sdl.SDL_CreateGPUShader(device, &shader_create_info) orelse util.sdlPanic();
 }

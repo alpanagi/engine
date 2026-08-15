@@ -1,5 +1,5 @@
-const std = @import("std");
 const sdl = @import("sdl");
+const std = @import("std");
 
 const GPUBuffer = @import("gpu_buffer.zig").GPUBuffer;
 const Instance = @import("instance.zig").Instance;

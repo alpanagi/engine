@@ -1,7 +1,6 @@
 const ecs = @import("ecs");
 const sdl = @import("sdl");
 const std = @import("std");
-
 const util = @import("../util.zig");
 
 const AssetLoader = @import("../resources/asset_loader/asset_loader.zig").AssetLoader;
@@ -28,8 +27,8 @@ pub const Window = struct {
         icon: ?*sdl.SDL_Surface,
         width: u32,
         height: u32,
-    ) !Window {
-        const window_title = try allocator.dupeZ(u8, title);
+    ) Window {
+        const window_title = allocator.dupeZ(u8, title) catch util.panicOom("Window.init");
 
         const sdl_window: *sdl.SDL_Window = sdl.SDL_CreateWindow(
             window_title.ptr,
@@ -66,9 +65,9 @@ pub const WindowPlugin = struct {
         if (self.icon) |icon| sdl.SDL_DestroySurface(icon);
     }
 
-    pub fn build(self: *WindowPlugin, commands: ecs.Commands) !void {
-        try commands.addObserver(onConfigAdded, self);
-        try commands.addSystem("update", readSDLWindowEvents, self);
+    pub fn build(self: *WindowPlugin, commands: ecs.Commands) void {
+        commands.addObserver(ecs.events.resource.added(Config), onConfigAdded, self);
+        commands.addSystem("update", readSDLWindowEvents, self);
     }
 
     pub fn onConfigAdded(
@@ -77,13 +76,13 @@ pub const WindowPlugin = struct {
         commands: ecs.Commands,
         config: ecs.Resource(Config),
         asset_loader: ecs.Resource(AssetLoader),
-        _: ecs.Event(ecs.events.resource.Added(Config)),
-    ) !void {
+        _: ecs.Event(ecs.events.ResourceAdded),
+    ) void {
         const clear_color = Color.fromHex(config.value.window.clear_color) catch Color{ .r = 0, .g = 0, .b = 0 };
 
         const icon = asset_loader.value.loadImage(allocator, config.value.window.icon) catch null;
 
-        var window = try Window.init(
+        const window = Window.init(
             allocator,
             config.value.window.title,
             clear_color,
@@ -91,9 +90,8 @@ pub const WindowPlugin = struct {
             1280,
             720,
         );
-        errdefer window.deinit(allocator);
 
-        try commands.spawn(.{window});
+        commands.spawn(.{window});
     }
 
     pub fn readSDLWindowEvents(

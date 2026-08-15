@@ -1,24 +1,19 @@
+const Vec4 = @import("vec4.zig").Vec4;
+
 pub const Quat = [4]f32;
+
+const epsilon: f32 = 1e-8;
 
 pub const identity: Quat = .{ 0, 0, 0, 1 };
 
-pub fn conjugate(q: Quat) Quat {
-    return .{ -q[0], -q[1], -q[2], q[3] };
-}
-
-pub fn fromAxisAngle(axis: [3]f32, angle: f32) Quat {
+pub fn fromAxisAngle(axis: Vec4, angle: f32) Quat {
     const length = @sqrt(axis[0] * axis[0] + axis[1] * axis[1] + axis[2] * axis[2]);
-    if (length == 0) return identity;
+    if (length < epsilon) return identity;
 
     const half = angle * 0.5;
     const scale = @sin(half) / length;
 
-    return .{
-        axis[0] * scale,
-        axis[1] * scale,
-        axis[2] * scale,
-        @cos(half),
-    };
+    return .{ axis[0] * scale, axis[1] * scale, axis[2] * scale, @cos(half) };
 }
 
 pub fn mul(a: Quat, b: Quat) Quat {
@@ -32,7 +27,11 @@ pub fn mul(a: Quat, b: Quat) Quat {
 
 pub fn normalize(q: Quat) Quat {
     const length = @sqrt(q[0] * q[0] + q[1] * q[1] + q[2] * q[2] + q[3] * q[3]);
-    if (length == 0) return identity;
+    if (length < epsilon) return identity;
 
     return .{ q[0] / length, q[1] / length, q[2] / length, q[3] / length };
+}
+
+pub fn conjugate(q: Quat) Quat {
+    return .{ -q[0], -q[1], -q[2], q[3] };
 }

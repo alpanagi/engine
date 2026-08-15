@@ -1,15 +1,15 @@
 const std = @import("std");
+const util = @import("../util.zig");
 
 pub const Config = struct {
     window: WindowConfig = .{},
 
-    pub fn default(alloc: std.mem.Allocator) !Config {
-        const window = try WindowConfig.default(alloc);
-        return .{ .window = window };
+    pub fn default(allocator: std.mem.Allocator) Config {
+        return .{ .window = WindowConfig.default(allocator) };
     }
 
-    pub fn deinit(self: *Config, alloc: std.mem.Allocator) void {
-        self.window.deinit(alloc);
+    pub fn deinit(self: *Config, allocator: std.mem.Allocator) void {
+        self.window.deinit(allocator);
     }
 };
 
@@ -18,24 +18,19 @@ pub const WindowConfig = struct {
     clear_color: []const u8 = "#000000",
     icon: []const u8 = "icon.png",
 
-    pub fn default(alloc: std.mem.Allocator) !WindowConfig {
-        var window: WindowConfig = .{};
+    pub fn default(allocator: std.mem.Allocator) WindowConfig {
+        const defaults: WindowConfig = .{};
 
-        window.title = try alloc.dupe(u8, window.title);
-        errdefer alloc.free(window.title);
-
-        window.clear_color = try alloc.dupe(u8, window.clear_color);
-        errdefer alloc.free(window.clear_color);
-
-        window.icon = try alloc.dupe(u8, window.icon);
-        errdefer alloc.free(window.icon);
-
-        return window;
+        return .{
+            .title = allocator.dupe(u8, defaults.title) catch util.panicOom("WindowConfig.default"),
+            .clear_color = allocator.dupe(u8, defaults.clear_color) catch util.panicOom("WindowConfig.default"),
+            .icon = allocator.dupe(u8, defaults.icon) catch util.panicOom("WindowConfig.default"),
+        };
     }
 
-    pub fn deinit(self: *WindowConfig, alloc: std.mem.Allocator) void {
-        alloc.free(self.title);
-        alloc.free(self.clear_color);
-        alloc.free(self.icon);
+    pub fn deinit(self: *WindowConfig, allocator: std.mem.Allocator) void {
+        allocator.free(self.title);
+        allocator.free(self.clear_color);
+        allocator.free(self.icon);
     }
 };

@@ -12,6 +12,10 @@ pub fn panic(comptime message: []const u8, args: anytype) noreturn {
     std.process.exit(1);
 }
 
+pub fn panicOom(comptime function_name: []const u8) noreturn {
+    panic(function_name ++ ": out of memory", .{});
+}
+
 pub fn sdlPanic() noreturn {
     std.log.err("{s}\n", .{sdl.SDL_GetError()});
     std.process.exit(1);

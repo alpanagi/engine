@@ -5,12 +5,12 @@
     .minimum_zig_version = "0.16.0",
     .dependencies = .{
         .toml = .{
-            .url = "git+https://github.com/alpanagi/toml.git#eadbb305f2670601630c7404887faa6c3b3870a9",
-            .hash = "toml-0.0.0-yNlRTDPpAAC7fyA8eKvEQF6X2oud4c355zZbJWKwssyS",
+            .url = "git+https://github.com/alpanagi/toml.git#1703e00774c459dda8b6e2cdd99e59342f9cc0c6",
+            .hash = "toml-0.0.0-yNlRTNaqAQBDJQJQuIZUBI5snk6Cfz1iia4gnLKJFZOl",
         },
         .ecs = .{
-            .url = "git+https://github.com/alpanagi/ecs.git#3567eeb887f574d89a74d77980cf3ef8cce39f35",
-            .hash = "ecs-0.0.0-3WUiB8KDAwDLQ1j2o6EhORhrYlcPCs_Jok-NZU61Ngb8",
+            .url = "git+https://github.com/alpanagi/ecs.git#98864867a596f5940627e0705b934cc6cb507a17",
+            .hash = "ecs-0.0.0-3WUiB54gBAA6yL46grG9ImsjT3xdfg-dUbkc5qo2o0gm",
         },
         .shaders = .{
             .url = "https://github.com/alpanagi/shaders/releases/download/v0.0.0/shaders-v0.0.0.tar.gz",

@@ -1,21 +1,23 @@
+const obj = @import("parsers/obj.zig");
 const sdl = @import("sdl");
 const sdl_image = @import("sdl_image");
 const std = @import("std");
 const toml = @import("toml");
-
-const obj = @import("obj.zig");
-
 const util = @import("../../util.zig");
 
-const MeshData = @import("../mesh_data.zig").MeshData;
+const MeshData = @import("../../data/mesh_data.zig").MeshData;
+
+pub const AssetLoaderError = error{
+    ImageLoadFailed,
+};
 
 pub const File = struct {
     path: []const u8,
     data: ?[]u8,
 
-    fn init(allocator: std.mem.Allocator, path: []const u8) !File {
+    fn init(allocator: std.mem.Allocator, path: []const u8) File {
         return File{
-            .path = try allocator.dupe(u8, path),
+            .path = allocator.dupe(u8, path) catch util.panicOom("File.init"),
             .data = null,
         };
     }
@@ -28,11 +30,11 @@ pub const File = struct {
 
 pub const AssetLoader = struct {
     pub const Options = struct {
-        isConcurrent: bool = true,
+        is_concurrent: bool = true,
         working_directory: []const u8,
     };
 
-    isConcurrent: bool,
+    is_concurrent: bool,
     working_directory: []const u8,
 
     io: std.Io,
@@ -40,11 +42,12 @@ pub const AssetLoader = struct {
     completed_mutex: std.Io.Mutex = .init,
     completed: std.ArrayList(File) = .empty,
 
-    pub fn init(allocator: std.mem.Allocator, io: std.Io, options: Options) !AssetLoader {
+    pub fn init(allocator: std.mem.Allocator, io: std.Io, options: Options) AssetLoader {
         return AssetLoader{
             .io = io,
-            .isConcurrent = options.isConcurrent,
-            .working_directory = try allocator.dupe(u8, options.working_directory),
+            .is_concurrent = options.is_concurrent,
+            .working_directory = allocator.dupe(u8, options.working_directory) catch
+                util.panicOom("AssetLoader.init"),
         };
     }
 
@@ -57,43 +60,36 @@ pub const AssetLoader = struct {
         allocator.free(self.working_directory);
     }
 
+    pub fn readBinaryFileAlloc(
+        self: *AssetLoader,
+        allocator: std.mem.Allocator,
+        path: []const u8,
+    ) ![]u8 {
+        const full_path = std.fs.path.join(allocator, &.{ self.working_directory, path }) catch
+            util.panicOom("AssetLoader.readBinaryFileAlloc");
+        defer allocator.free(full_path);
+
+        const cwd = std.Io.Dir.cwd();
+        return cwd.readFileAlloc(self.io, full_path, allocator, .unlimited) catch |err| switch (err) {
+            error.OutOfMemory => util.panicOom("AssetLoader.readBinaryFileAlloc"),
+            else => |e| return e,
+        };
+    }
+
     pub fn readFileAsync(
         self: *AssetLoader,
         allocator: std.mem.Allocator,
         path: []const u8,
-    ) !void {
-        var file = try File.init(allocator, path);
-        errdefer file.deinit(allocator);
+    ) void {
+        const file = File.init(allocator, path);
 
-        if (!self.isConcurrent) {
-            file.data = self.readData(allocator, file.path);
-            self.complete(allocator, file);
+        if (!self.is_concurrent) {
+            readFileWorker(self, allocator, file);
             return;
         }
 
-        try self.pending_group.concurrent(self.io, readFileWorker, .{ self, allocator, file });
-    }
-
-    fn readFileWorker(self: *AssetLoader, allocator: std.mem.Allocator, requested: File) void {
-        var file = requested;
-        file.data = self.readData(allocator, file.path);
-
-        self.complete(allocator, file);
-    }
-
-    fn complete(self: *AssetLoader, allocator: std.mem.Allocator, file: File) void {
-        self.completed_mutex.lockUncancelable(self.io);
-        defer self.completed_mutex.unlock(self.io);
-
-        self.completed.append(allocator, file) catch {
-            util.panic("Out of memory for completed file.\n", .{});
-        };
-    }
-
-    fn readData(self: *AssetLoader, allocator: std.mem.Allocator, path: []const u8) ?[]u8 {
-        return self.readBinaryFileAlloc(allocator, path) catch |err| {
-            std.log.err("failed to read {s}: {t}\n", .{ path, err });
-            return null;
+        self.pending_group.concurrent(self.io, readFileWorker, .{ self, allocator, file }) catch {
+            readFileWorker(self, allocator, file);
         };
     }
 
@@ -101,42 +97,26 @@ pub const AssetLoader = struct {
         self.completed_mutex.lockUncancelable(self.io);
         defer self.completed_mutex.unlock(self.io);
 
-        return self.completed.toOwnedSlice(allocator) catch {
-            util.panic("Out of memory for completed files.\n", .{});
-        };
+        return self.completed.toOwnedSlice(allocator) catch
+            util.panicOom("AssetLoader.takeCompletedFiles");
     }
 
-    pub fn readToml(
-        self: *AssetLoader,
-        allocator: std.mem.Allocator,
-        comptime T: type,
-        path: []const u8,
-    ) !T {
-        const text = try self.readBinaryFileAlloc(allocator, path);
-        defer allocator.free(text);
-
-        return self.parseToml(allocator, T, text);
-    }
-
-    pub fn parseToml(
-        _: *AssetLoader,
-        allocator: std.mem.Allocator,
-        comptime T: type,
-        text: []const u8,
-    ) !T {
-        return toml.parse(T, allocator, text) catch T.default(allocator);
-    }
-
-    pub fn readBinaryFileAlloc(
+    pub fn loadImage(
         self: *AssetLoader,
         allocator: std.mem.Allocator,
         path: []const u8,
-    ) ![]u8 {
-        const full_path = try std.fs.path.join(allocator, &.{ self.working_directory, path });
+    ) !*sdl.SDL_Surface {
+        const full_path = std.fs.path.joinZ(allocator, &.{ self.working_directory, path }) catch
+            util.panicOom("AssetLoader.loadImage");
         defer allocator.free(full_path);
 
-        const cwd = std.Io.Dir.cwd();
-        return cwd.readFileAlloc(self.io, full_path, allocator, .unlimited);
+        const image = sdl_image.IMG_Load(full_path.ptr);
+        if (image == null) {
+            std.log.err("failed to load image {s}: {s}\n", .{ path, sdl.SDL_GetError() });
+            return AssetLoaderError.ImageLoadFailed;
+        }
+
+        return @ptrCast(image);
     }
 
     pub fn loadObj(
@@ -150,6 +130,18 @@ pub const AssetLoader = struct {
         return self.parseObj(allocator, bytes);
     }
 
+    pub fn loadToml(
+        self: *AssetLoader,
+        allocator: std.mem.Allocator,
+        comptime T: type,
+        path: []const u8,
+    ) !T {
+        const text = try self.readBinaryFileAlloc(allocator, path);
+        defer allocator.free(text);
+
+        return self.parseToml(allocator, T, text);
+    }
+
     pub fn parseObj(
         _: *AssetLoader,
         allocator: std.mem.Allocator,
@@ -159,14 +151,27 @@ pub const AssetLoader = struct {
         return obj.parse(allocator, &reader);
     }
 
-    pub fn loadImage(
-        self: *AssetLoader,
+    pub fn parseToml(
+        _: *AssetLoader,
         allocator: std.mem.Allocator,
-        path: []const u8,
-    ) !?*sdl.SDL_Surface {
-        const full_path = try std.fs.path.joinZ(allocator, &.{ self.working_directory, path });
-        defer allocator.free(full_path);
-        const image = sdl_image.IMG_Load(full_path.ptr);
-        return @as(?*sdl.SDL_Surface, @ptrCast(image));
+        comptime T: type,
+        text: []const u8,
+    ) T {
+        return toml.parseAlloc(allocator, T, text) catch T.default(allocator);
+    }
+
+    fn readFileWorker(self: *AssetLoader, allocator: std.mem.Allocator, requested: File) void {
+        var file = requested;
+
+        if (self.readBinaryFileAlloc(allocator, file.path)) |data| {
+            file.data = data;
+        } else |err| {
+            std.log.err("failed to read {s}: {t}\n", .{ file.path, err });
+        }
+
+        self.completed_mutex.lockUncancelable(self.io);
+        defer self.completed_mutex.unlock(self.io);
+
+        self.completed.append(allocator, file) catch util.panicOom("AssetLoader.readFileWorker");
     }
 };
