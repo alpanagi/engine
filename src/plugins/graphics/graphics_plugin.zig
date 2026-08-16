@@ -20,6 +20,8 @@ const Transform = @import("../../components/transform.zig").Transform;
 const Window = @import("../window_plugin.zig").Window;
 const WindowDestroying = @import("../window_plugin.zig").WindowDestroying;
 
+const texture_format = sdl.SDL_GPU_TEXTUREFORMAT_R8G8B8A8_UNORM;
+
 const MeshLocation = struct {
     material: u32,
     gpu_mesh: u32,
@@ -28,11 +30,14 @@ const MeshLocation = struct {
 pub const GraphicsPlugin = struct {
     device: *sdl.SDL_GPUDevice,
     sdl_window: ?*sdl.SDL_Window = null,
-    swapchain_format: sdl.SDL_GPUTextureFormat = sdl.SDL_GPU_TEXTUREFORMAT_INVALID,
     materials: std.ArrayList(Material) = .empty,
     material_index_by_id: std.AutoHashMapUnmanaged(u64, u32) = .empty,
     mesh_location_by_id: std.AutoHashMapUnmanaged(u64, MeshLocation) = .empty,
     entities_by_mesh_id: std.AutoHashMapUnmanaged(u64, std.ArrayList(ecs.Entity)) = .empty,
+
+    color_target: ?*sdl.SDL_GPUTexture = null,
+    color_target_width: u32 = 0,
+    color_target_height: u32 = 0,
 
     clear_color: Color = Color.black,
 
@@ -65,6 +70,7 @@ pub const GraphicsPlugin = struct {
         }
         self.sdl_window = null;
 
+        if (self.color_target) |color_target| sdl.SDL_ReleaseGPUTexture(self.device, color_target);
         sdl.SDL_DestroyGPUDevice(self.device);
     }
 
@@ -107,7 +113,6 @@ pub const GraphicsPlugin = struct {
         }
 
         self.sdl_window = window.sdl_window;
-        self.swapchain_format = sdl.SDL_GetGPUSwapchainTextureFormat(self.device, window.sdl_window);
 
         const diffuse = allocator.dupe(u8, shaders.diffuse) catch
             util.panicOom("GraphicsPlugin.onWindowCreate");
@@ -187,8 +192,6 @@ pub const GraphicsPlugin = struct {
         materials: ecs.Resource(Materials),
     ) void {
         if (materials.value.pending.items.len == 0) return;
-        if (self.swapchain_format == sdl.SDL_GPU_TEXTUREFORMAT_INVALID) return;
-
         defer materials.value.pending.clearRetainingCapacity();
 
         for (materials.value.pending.items) |*pending| {
@@ -200,7 +203,7 @@ pub const GraphicsPlugin = struct {
                 util.panicOom("GraphicsPlugin.registerPendingMaterials");
             self.materials.append(
                 allocator,
-                Material.init(self.device, self.swapchain_format, pending.shader_data),
+                Material.init(self.device, texture_format, pending.shader_data),
             ) catch util.panicOom("GraphicsPlugin.registerPendingMaterials");
         }
     }
@@ -211,8 +214,6 @@ pub const GraphicsPlugin = struct {
         meshes: ecs.Resource(Meshes),
     ) void {
         if (meshes.value.pending.items.len == 0) return;
-        if (self.swapchain_format == sdl.SDL_GPU_TEXTUREFORMAT_INVALID) return;
-
         defer meshes.value.pending.clearRetainingCapacity();
 
         for (meshes.value.pending.items) |*pending_mesh| {
@@ -327,6 +328,26 @@ pub const GraphicsPlugin = struct {
         }
 
         if (swapchain_texture) |texture| {
+            if (self.color_target_width != swapchain_texture_width or
+                self.color_target_height != swapchain_texture_height)
+            {
+                if (self.color_target) |color_target| sdl.SDL_ReleaseGPUTexture(self.device, color_target);
+
+                self.color_target = sdl.SDL_CreateGPUTexture(self.device, &.{
+                    .type = sdl.SDL_GPU_TEXTURETYPE_2D,
+                    .usage = sdl.SDL_GPU_TEXTUREUSAGE_COLOR_TARGET,
+                    .format = texture_format,
+                    .width = swapchain_texture_width,
+                    .height = swapchain_texture_height,
+                    .layer_count_or_depth = 1,
+                    .num_levels = 1,
+                    .sample_count = sdl.SDL_GPU_SAMPLECOUNT_1,
+                }) orelse util.sdlPanic();
+
+                self.color_target_width = swapchain_texture_width;
+                self.color_target_height = swapchain_texture_height;
+            }
+
             const aspect = @as(f32, @floatFromInt(swapchain_texture_width)) /
                 @as(f32, @floatFromInt(swapchain_texture_height));
 
@@ -343,7 +364,7 @@ pub const GraphicsPlugin = struct {
             );
 
             const color_target_info = sdl.SDL_GPUColorTargetInfo{
-                .texture = texture,
+                .texture = self.color_target.?,
                 .clear_color = sdl.SDL_FColor{
                     .r = self.clear_color.r,
                     .g = self.clear_color.g,
@@ -382,6 +403,21 @@ pub const GraphicsPlugin = struct {
             }
 
             sdl.SDL_EndGPURenderPass(render_pass);
+
+            sdl.SDL_BlitGPUTexture(command_buffer, &.{
+                .source = .{
+                    .texture = self.color_target.?,
+                    .w = swapchain_texture_width,
+                    .h = swapchain_texture_height,
+                },
+                .destination = .{
+                    .texture = texture,
+                    .w = swapchain_texture_width,
+                    .h = swapchain_texture_height,
+                },
+                .load_op = sdl.SDL_GPU_LOADOP_DONT_CARE,
+                .filter = sdl.SDL_GPU_FILTER_NEAREST,
+            });
         }
 
         if (!sdl.SDL_SubmitGPUCommandBuffer(command_buffer)) util.sdlPanic();
