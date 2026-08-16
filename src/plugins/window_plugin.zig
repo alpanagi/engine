@@ -4,7 +4,6 @@ const std = @import("std");
 const util = @import("../util.zig");
 
 const AssetLoader = @import("../resources/asset_loader/asset_loader.zig").AssetLoader;
-const Color = @import("../color.zig").Color;
 const Config = @import("../resources/config.zig").Config;
 const ShuttingDown = @import("../engine.zig").events.ShuttingDown;
 
@@ -14,7 +13,6 @@ pub const Window = struct {
     sdl_window: *sdl.SDL_Window,
 
     title: [:0]u8,
-    clear_color: Color,
     icon: ?*sdl.SDL_Surface = null,
 
     width: u32,
@@ -23,7 +21,6 @@ pub const Window = struct {
     pub fn init(
         allocator: std.mem.Allocator,
         title: []const u8,
-        clear_color: Color,
         icon: ?*sdl.SDL_Surface,
         width: u32,
         height: u32,
@@ -42,7 +39,6 @@ pub const Window = struct {
         return Window{
             .sdl_window = sdl_window,
             .title = window_title,
-            .clear_color = clear_color,
             .icon = icon,
             .width = width,
             .height = height,
@@ -78,19 +74,8 @@ pub const WindowPlugin = struct {
         asset_loader: ecs.Resource(AssetLoader),
         _: ecs.Event(ecs.events.ResourceAdded),
     ) void {
-        const clear_color = Color.fromHex(config.value.window.clear_color) catch Color{ .r = 0, .g = 0, .b = 0 };
-
         const icon = asset_loader.value.loadImage(allocator, config.value.window.icon) catch null;
-
-        const window = Window.init(
-            allocator,
-            config.value.window.title,
-            clear_color,
-            icon,
-            1280,
-            720,
-        );
-
+        const window = Window.init(allocator, config.value.window.title, icon, 1280, 720);
         commands.spawn(.{window});
     }
 

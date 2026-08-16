@@ -7,6 +7,8 @@ pub const ParseHexError = error{
 };
 
 pub const Color = struct {
+    pub const black: Color = Color{ .r = 0, .g = 0, .b = 0 };
+
     r: f32,
     g: f32,
     b: f32,

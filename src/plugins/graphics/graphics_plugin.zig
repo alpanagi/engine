@@ -8,6 +8,8 @@ const view_projection = @import("view_projection.zig");
 
 const Active = @import("../../components/active.zig").Active;
 const Camera = @import("../../components/camera.zig").Camera;
+const Color = @import("../../color.zig").Color;
+const Config = @import("../../resources/config.zig").Config;
 const GPUMesh = @import("gpu_mesh.zig").GPUMesh;
 const Instance = @import("instance.zig").Instance;
 const Material = @import("material.zig").Material;
@@ -31,6 +33,8 @@ pub const GraphicsPlugin = struct {
     material_index_by_id: std.AutoHashMapUnmanaged(u64, u32) = .empty,
     mesh_location_by_id: std.AutoHashMapUnmanaged(u64, MeshLocation) = .empty,
     entities_by_mesh_id: std.AutoHashMapUnmanaged(u64, std.ArrayList(ecs.Entity)) = .empty,
+
+    clear_color: Color = Color.black,
 
     pub fn init() GraphicsPlugin {
         const device = sdl.SDL_CreateGPUDevice(
@@ -65,6 +69,7 @@ pub const GraphicsPlugin = struct {
     }
 
     pub fn build(self: *GraphicsPlugin, commands: ecs.Commands) void {
+        commands.addObserver(ecs.events.resource.added(Config), onConfigAdded, self);
         commands.addObserver(ecs.events.component.added(Window), onWindowCreate, self);
         commands.addObserver(ecs.EventId.from(WindowDestroying), onWindowDestroy, self);
         commands.addObserver(ecs.events.component.added(MeshInstance), onMeshInstanceAdded, self);
@@ -75,6 +80,18 @@ pub const GraphicsPlugin = struct {
         commands.addSystem("post-update", addPendingInstances, self);
         commands.addSystem("post-update", uploadDirtyBuffers, self);
         commands.addSystem("post-update", draw, self);
+    }
+
+    pub fn onConfigAdded(
+        self: *GraphicsPlugin,
+        config: ecs.Resource(Config),
+        _: ecs.Event(ecs.events.ResourceAdded),
+    ) void {
+        if (Color.fromHex(config.value.clear_color)) |color| {
+            self.clear_color = color;
+        } else |err| {
+            std.log.err("invalid clear color {s}: {t}", .{ config.value.clear_color, err });
+        }
     }
 
     pub fn onWindowCreate(
@@ -292,6 +309,7 @@ pub const GraphicsPlugin = struct {
     ) void {
         var it = windows.iterator();
         const window = (it.next() orelse return)[0];
+        const camera, const camera_transform, _ = cameras.first() orelse return;
 
         const command_buffer = sdl.SDL_AcquireGPUCommandBuffer(self.device) orelse util.sdlPanic();
 
@@ -312,15 +330,10 @@ pub const GraphicsPlugin = struct {
             const aspect = @as(f32, @floatFromInt(swapchain_texture_width)) /
                 @as(f32, @floatFromInt(swapchain_texture_height));
 
-            const view_projection_matrix = if (cameras.first()) |entity| blk: {
-                const camera = entity[0];
-                const transform = entity[1];
-
-                break :blk mat4.mul(
-                    view_projection.perspective(camera.fov_y, aspect, camera.near, camera.far),
-                    view_projection.viewFromTransform(transform.position, transform.rotation),
-                );
-            } else mat4.identity;
+            const view_projection_matrix = mat4.mul(
+                view_projection.perspective(camera.fov_y, aspect, camera.near, camera.far),
+                view_projection.viewFromTransform(camera_transform.position, camera_transform.rotation),
+            );
 
             sdl.SDL_PushGPUVertexUniformData(
                 command_buffer,
@@ -332,10 +345,10 @@ pub const GraphicsPlugin = struct {
             const color_target_info = sdl.SDL_GPUColorTargetInfo{
                 .texture = texture,
                 .clear_color = sdl.SDL_FColor{
-                    .r = window.clear_color.r,
-                    .g = window.clear_color.g,
-                    .b = window.clear_color.b,
-                    .a = window.clear_color.a,
+                    .r = self.clear_color.r,
+                    .g = self.clear_color.g,
+                    .b = self.clear_color.b,
+                    .a = self.clear_color.a,
                 },
                 .load_op = sdl.SDL_GPU_LOADOP_CLEAR,
                 .store_op = sdl.SDL_GPU_STOREOP_STORE,
