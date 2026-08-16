@@ -28,35 +28,31 @@ pub const GraphicsPlugin = struct {
     sdl_window: ?*sdl.SDL_Window = null,
     swapchain_format: sdl.SDL_GPUTextureFormat = sdl.SDL_GPU_TEXTUREFORMAT_INVALID,
     materials: std.ArrayList(Material) = .empty,
-    index_by_id: std.AutoHashMapUnmanaged(u64, u32) = .empty,
+    material_index_by_id: std.AutoHashMapUnmanaged(u64, u32) = .empty,
     mesh_location_by_id: std.AutoHashMapUnmanaged(u64, MeshLocation) = .empty,
+    entities_by_mesh_id: std.AutoHashMapUnmanaged(u64, std.ArrayList(ecs.Entity)) = .empty,
 
     pub fn deinit(self: *GraphicsPlugin, allocator: std.mem.Allocator) void {
+        var entity_lists = self.entities_by_mesh_id.valueIterator();
+        while (entity_lists.next()) |entities| entities.deinit(allocator);
+        self.entities_by_mesh_id.deinit(allocator);
+
         self.mesh_location_by_id.deinit(allocator);
-        self.index_by_id.deinit(allocator);
+        self.material_index_by_id.deinit(allocator);
 
         for (self.materials.items) |*material| material.deinit(allocator);
         self.materials.deinit(allocator);
     }
 
-    fn register(self: *GraphicsPlugin, allocator: std.mem.Allocator, id: []const u8, material: Material) void {
-        const index: u32 = @intCast(self.materials.items.len);
-
-        self.index_by_id.put(allocator, util.hashBytes(id), index) catch
-            util.panicOom("GraphicsPlugin.register");
-        self.materials.append(allocator, material) catch util.panicOom("GraphicsPlugin.register");
-    }
-
-    fn find(self: *const GraphicsPlugin, id: []const u8) ?u32 {
-        return self.index_by_id.get(util.hashBytes(id));
-    }
-
     pub fn build(self: *GraphicsPlugin, commands: ecs.Commands) void {
         commands.addObserver(ecs.events.component.added(Window), onWindowCreate, self);
         commands.addObserver(ecs.EventId.from(WindowDestroying), onWindowDestroy, self);
+        commands.addObserver(ecs.events.component.added(MeshInstance), onMeshInstanceAdded, self);
+        commands.addObserver(ecs.events.component.destroying(MeshInstance), onMeshInstanceDestroying, self);
+
         commands.addSystem("post-update", uploadPendingMaterials, self);
         commands.addSystem("post-update", uploadPendingMeshes, self);
-        commands.addSystem("post-update", assignInstances, self);
+        commands.addSystem("post-update", assignPendingInstances, self);
         commands.addSystem("post-update", uploadBuffers, self);
         commands.addSystem("post-update", draw, self);
     }
@@ -66,9 +62,9 @@ pub const GraphicsPlugin = struct {
         allocator: std.mem.Allocator,
         materials: ecs.Resource(Materials),
         windows: ecs.Query(&.{Window}),
-        added: ecs.Event(ecs.events.ComponentAdded),
+        component_added_event: ecs.Event(ecs.events.ComponentAdded),
     ) void {
-        const window = (windows.get(added.value.entity) catch return)[0];
+        const window = (windows.get(component_added_event.value.entity) catch return)[0];
 
         const device = sdl.SDL_CreateGPUDevice(
             sdl.SDL_GPU_SHADERFORMAT_SPIRV,
@@ -90,6 +86,89 @@ pub const GraphicsPlugin = struct {
         materials.value.addOwned(allocator, "engine.diffuse", diffuse);
     }
 
+    pub fn onWindowDestroy(
+        self: *GraphicsPlugin,
+        allocator: std.mem.Allocator,
+        _: ecs.Event(WindowDestroying),
+    ) void {
+        if (self.device) |device| {
+            for (self.materials.items) |*material| {
+                material.sdlDeinit(device);
+                material.deinit(allocator);
+            }
+
+            var entity_lists = self.entities_by_mesh_id.valueIterator();
+            while (entity_lists.next()) |entities| entities.deinit(allocator);
+            self.entities_by_mesh_id.clearRetainingCapacity();
+
+            self.mesh_location_by_id.clearRetainingCapacity();
+            self.material_index_by_id.clearRetainingCapacity();
+            self.materials.clearRetainingCapacity();
+
+            if (self.sdl_window) |window| sdl.SDL_ReleaseWindowFromGPUDevice(device, window);
+            sdl.SDL_DestroyGPUDevice(device);
+            self.device = null;
+        }
+        self.sdl_window = null;
+    }
+
+    pub fn onMeshInstanceAdded(
+        self: *GraphicsPlugin,
+        allocator: std.mem.Allocator,
+        meshes: ecs.Resource(Meshes),
+        mesh_instances: ecs.Query(&.{MeshInstance}),
+        component_added_event: ecs.Event(ecs.events.ComponentAdded),
+    ) void {
+        const entity = component_added_event.value.entity;
+        const mesh_instance = (mesh_instances.get(entity) catch return)[0];
+        const mesh_id = util.hashBytes(mesh_instance.id);
+
+        if (!self.mesh_location_by_id.contains(mesh_id)) {
+            const is_pending_mesh = for (meshes.value.pending.items) |pending| {
+                if (std.mem.eql(u8, pending.id, mesh_instance.id)) break true;
+            } else false;
+
+            if (!is_pending_mesh) {
+                std.log.err("entity references unknown mesh {s}", .{mesh_instance.id});
+                return;
+            }
+        }
+
+        const gop = self.entities_by_mesh_id.getOrPut(allocator, mesh_id) catch
+            util.panicOom("GraphicsPlugin.onMeshInstanceAdded");
+        if (!gop.found_existing) gop.value_ptr.* = .empty;
+
+        gop.value_ptr.append(allocator, entity) catch
+            util.panicOom("GraphicsPlugin.onMeshInstanceAdded");
+    }
+
+    pub fn onMeshInstanceDestroying(
+        self: *GraphicsPlugin,
+        allocator: std.mem.Allocator,
+        mesh_instances: ecs.Query(&.{MeshInstance}),
+        component_destroying_event: ecs.Event(ecs.events.ComponentDestroying),
+    ) void {
+        const entity = component_destroying_event.value.entity;
+        const mesh_instance = (mesh_instances.get(entity) catch return)[0];
+        if (mesh_instance.instance_index != null) return;
+
+        const mesh_id = util.hashBytes(mesh_instance.id);
+        const pending_entities = self.entities_by_mesh_id.getPtr(mesh_id) orelse return;
+
+        for (pending_entities.items, 0..) |pending_entity, index| {
+            if (!std.meta.eql(pending_entity, entity)) continue;
+
+            _ = pending_entities.swapRemove(index);
+
+            if (pending_entities.items.len == 0) {
+                var empty = self.entities_by_mesh_id.fetchRemove(mesh_id).?.value;
+                empty.deinit(allocator);
+            }
+
+            return;
+        }
+    }
+
     pub fn uploadPendingMaterials(
         self: *GraphicsPlugin,
         allocator: std.mem.Allocator,
@@ -104,11 +183,14 @@ pub const GraphicsPlugin = struct {
         for (materials.value.pending.items) |*pending| {
             defer pending.deinit(allocator);
 
-            self.register(
+            const index: u32 = @intCast(self.materials.items.len);
+
+            self.material_index_by_id.put(allocator, util.hashBytes(pending.id), index) catch
+                util.panicOom("GraphicsPlugin.uploadPendingMaterials");
+            self.materials.append(
                 allocator,
-                pending.id,
                 Material.init(device, self.swapchain_format, pending.shader_data),
-            );
+            ) catch util.panicOom("GraphicsPlugin.uploadPendingMaterials");
         }
     }
 
@@ -123,76 +205,75 @@ pub const GraphicsPlugin = struct {
 
         defer meshes.value.pending.clearRetainingCapacity();
 
-        for (meshes.value.pending.items) |*mesh| {
-            defer mesh.deinit(allocator);
+        for (meshes.value.pending.items) |*pending_mesh| {
+            defer pending_mesh.deinit(allocator);
 
-            const id = util.hashBytes(mesh.id);
-            if (self.mesh_location_by_id.contains(id)) {
-                std.log.err("mesh {s} is already registered", .{mesh.id});
+            const mesh_id = util.hashBytes(pending_mesh.id);
+            if (self.mesh_location_by_id.contains(mesh_id)) {
+                std.log.err("mesh {s} is already registered", .{pending_mesh.id});
                 continue;
             }
 
-            const material_index = self.find(mesh.material) orelse {
-                std.log.err("mesh {s} requires unregistered material {s}", .{ mesh.id, mesh.material });
+            const material_index = self.material_index_by_id.get(util.hashBytes(pending_mesh.material)) orelse {
+                std.log.err("mesh {s} requires unregistered material {s}", .{ pending_mesh.id, pending_mesh.material });
+
+                if (self.entities_by_mesh_id.fetchRemove(mesh_id)) |dropped_entities| {
+                    var entities = dropped_entities.value;
+                    std.log.err("dropping {d} entities waiting on mesh {s}", .{ entities.items.len, pending_mesh.id });
+                    entities.deinit(allocator);
+                }
+
                 continue;
             };
 
             const material = &self.materials.items[material_index];
 
-            const vertex_offset = material.addVertices(device, mesh.data.positions);
-            const gpu_mesh = GPUMesh.init(device, vertex_offset, mesh.data.vertexCount());
+            const vertex_offset = material.addVertices(device, pending_mesh.data.positions);
+            const gpu_mesh = GPUMesh.init(device, vertex_offset, pending_mesh.data.vertexCount());
 
             const gpu_mesh_index = material.addGpuMesh(allocator, gpu_mesh);
 
-            self.mesh_location_by_id.put(allocator, id, .{
+            self.mesh_location_by_id.put(allocator, mesh_id, .{
                 .material = material_index,
                 .gpu_mesh = gpu_mesh_index,
             }) catch util.panicOom("GraphicsPlugin.uploadPendingMeshes");
         }
     }
 
-    pub fn assignInstances(
+    pub fn assignPendingInstances(
         self: *GraphicsPlugin,
-        meshes: ecs.Query(&.{ MeshInstance, Transform }),
+        allocator: std.mem.Allocator,
+        mesh_instances: ecs.Query(&.{ MeshInstance, Transform }),
     ) void {
+        if (self.entities_by_mesh_id.count() == 0) return;
+
         const device = self.device orelse return;
 
-        var it = meshes.iterator();
-        while (it.next()) |entity| {
-            const mesh = entity[0];
-            const transform = entity[1];
+        var mesh_ids: std.ArrayList(u64) = .empty;
+        defer mesh_ids.deinit(allocator);
 
-            if (mesh.instance_index != null) continue;
-
-            const location = self.mesh_location_by_id.get(util.hashBytes(mesh.id)) orelse continue;
+        var it = self.entities_by_mesh_id.iterator();
+        while (it.next()) |entry| {
+            const location = self.mesh_location_by_id.get(entry.key_ptr.*) orelse continue;
 
             const material = &self.materials.items[location.material];
             const gpu_mesh = &material.gpu_meshes.items[location.gpu_mesh];
 
-            mesh.instance_index = gpu_mesh.addInstance(device, Instance{ .position = transform.position });
-        }
-    }
+            for (entry.value_ptr.items) |entity| {
+                const mesh_instance, const transform = mesh_instances.get(entity) catch continue;
 
-    pub fn onWindowDestroy(
-        self: *GraphicsPlugin,
-        allocator: std.mem.Allocator,
-        _: ecs.Event(WindowDestroying),
-    ) void {
-        if (self.device) |device| {
-            for (self.materials.items) |*material| {
-                material.sdlDeinit(device);
-                material.deinit(allocator);
+                mesh_instance.instance_index =
+                    gpu_mesh.addInstance(device, Instance{ .position = transform.position });
             }
 
-            self.mesh_location_by_id.clearRetainingCapacity();
-            self.index_by_id.clearRetainingCapacity();
-            self.materials.clearRetainingCapacity();
-
-            if (self.sdl_window) |window| sdl.SDL_ReleaseWindowFromGPUDevice(device, window);
-            sdl.SDL_DestroyGPUDevice(device);
-            self.device = null;
+            mesh_ids.append(allocator, entry.key_ptr.*) catch
+                util.panicOom("GraphicsPlugin.assignPendingInstances");
         }
-        self.sdl_window = null;
+
+        for (mesh_ids.items) |id| {
+            var pending_entities = (self.entities_by_mesh_id.fetchRemove(id) orelse continue).value;
+            pending_entities.deinit(allocator);
+        }
     }
 
     pub fn uploadBuffers(self: *GraphicsPlugin) void {
