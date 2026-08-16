@@ -75,6 +75,8 @@ pub const GraphicsPlugin = struct {
     }
 
     pub fn build(self: *GraphicsPlugin, commands: ecs.Commands) void {
+        commands.addOneShotSystem(setup, self);
+
         commands.addObserver(ecs.events.resource.added(Config), onConfigAdded, self);
         commands.addObserver(ecs.events.component.added(Window), onWindowCreate, self);
         commands.addObserver(ecs.EventId.from(WindowDestroying), onWindowDestroy, self);
@@ -86,6 +88,12 @@ pub const GraphicsPlugin = struct {
         commands.addSystem("post-update", addPendingInstances, self);
         commands.addSystem("post-update", uploadDirtyBuffers, self);
         commands.addSystem("post-update", draw, self);
+    }
+
+    pub fn setup(_: *GraphicsPlugin, allocator: std.mem.Allocator, materials: ecs.Resource(Materials)) void {
+        const diffuse = allocator.dupe(u8, shaders.diffuse) catch
+            util.panicOom("GraphicsPlugin.setup");
+        materials.value.addOwned(allocator, "engine.diffuse", diffuse);
     }
 
     pub fn onConfigAdded(
@@ -102,8 +110,6 @@ pub const GraphicsPlugin = struct {
 
     pub fn onWindowCreate(
         self: *GraphicsPlugin,
-        allocator: std.mem.Allocator,
-        materials: ecs.Resource(Materials),
         windows: ecs.Query(&.{Window}),
         component_added_event: ecs.Event(ecs.events.ComponentAdded),
     ) void {
@@ -113,10 +119,6 @@ pub const GraphicsPlugin = struct {
         }
 
         self.sdl_window = window.sdl_window;
-
-        const diffuse = allocator.dupe(u8, shaders.diffuse) catch
-            util.panicOom("GraphicsPlugin.onWindowCreate");
-        materials.value.addOwned(allocator, "engine.diffuse", diffuse);
     }
 
     pub fn onWindowDestroy(
