@@ -24,7 +24,7 @@ const MeshLocation = struct {
 };
 
 pub const GraphicsPlugin = struct {
-    device: ?*sdl.SDL_GPUDevice = null,
+    device: *sdl.SDL_GPUDevice,
     sdl_window: ?*sdl.SDL_Window = null,
     swapchain_format: sdl.SDL_GPUTextureFormat = sdl.SDL_GPU_TEXTUREFORMAT_INVALID,
     materials: std.ArrayList(Material) = .empty,
@@ -32,7 +32,23 @@ pub const GraphicsPlugin = struct {
     mesh_location_by_id: std.AutoHashMapUnmanaged(u64, MeshLocation) = .empty,
     entities_by_mesh_id: std.AutoHashMapUnmanaged(u64, std.ArrayList(ecs.Entity)) = .empty,
 
+    pub fn init() GraphicsPlugin {
+        const device = sdl.SDL_CreateGPUDevice(
+            sdl.SDL_GPU_SHADERFORMAT_SPIRV,
+            false,
+            "vulkan",
+        ) orelse util.sdlPanic();
+
+        return .{ .device = device };
+    }
+
     pub fn deinit(self: *GraphicsPlugin, allocator: std.mem.Allocator) void {
+        for (self.materials.items) |*material| {
+            material.sdlDeinit(self.device);
+            material.deinit(allocator);
+        }
+        self.materials.deinit(allocator);
+
         var entity_lists = self.entities_by_mesh_id.valueIterator();
         while (entity_lists.next()) |entities| entities.deinit(allocator);
         self.entities_by_mesh_id.deinit(allocator);
@@ -40,8 +56,12 @@ pub const GraphicsPlugin = struct {
         self.mesh_location_by_id.deinit(allocator);
         self.material_index_by_id.deinit(allocator);
 
-        for (self.materials.items) |*material| material.deinit(allocator);
-        self.materials.deinit(allocator);
+        if (self.sdl_window) |window| {
+            sdl.SDL_ReleaseWindowFromGPUDevice(self.device, window);
+        }
+        self.sdl_window = null;
+
+        sdl.SDL_DestroyGPUDevice(self.device);
     }
 
     pub fn build(self: *GraphicsPlugin, commands: ecs.Commands) void {
@@ -50,10 +70,10 @@ pub const GraphicsPlugin = struct {
         commands.addObserver(ecs.events.component.added(MeshInstance), onMeshInstanceAdded, self);
         commands.addObserver(ecs.events.component.destroying(MeshInstance), onMeshInstanceDestroying, self);
 
-        commands.addSystem("post-update", uploadPendingMaterials, self);
-        commands.addSystem("post-update", uploadPendingMeshes, self);
-        commands.addSystem("post-update", assignPendingInstances, self);
-        commands.addSystem("post-update", uploadBuffers, self);
+        commands.addSystem("post-update", registerPendingMaterials, self);
+        commands.addSystem("post-update", registerPendingMeshes, self);
+        commands.addSystem("post-update", addPendingInstances, self);
+        commands.addSystem("post-update", uploadDirtyBuffers, self);
         commands.addSystem("post-update", draw, self);
     }
 
@@ -65,49 +85,24 @@ pub const GraphicsPlugin = struct {
         component_added_event: ecs.Event(ecs.events.ComponentAdded),
     ) void {
         const window = (windows.get(component_added_event.value.entity) catch return)[0];
-
-        const device = sdl.SDL_CreateGPUDevice(
-            sdl.SDL_GPU_SHADERFORMAT_SPIRV,
-            false,
-            "vulkan",
-        ) orelse util.sdlPanic();
-
-        if (!sdl.SDL_ClaimWindowForGPUDevice(device, window.sdl_window)) {
+        if (!sdl.SDL_ClaimWindowForGPUDevice(self.device, window.sdl_window)) {
             util.sdlPanic();
         }
 
-        self.device = device;
         self.sdl_window = window.sdl_window;
-        self.swapchain_format = sdl.SDL_GetGPUSwapchainTextureFormat(device, window.sdl_window);
+        self.swapchain_format = sdl.SDL_GetGPUSwapchainTextureFormat(self.device, window.sdl_window);
 
         const diffuse = allocator.dupe(u8, shaders.diffuse) catch
             util.panicOom("GraphicsPlugin.onWindowCreate");
-
         materials.value.addOwned(allocator, "engine.diffuse", diffuse);
     }
 
     pub fn onWindowDestroy(
         self: *GraphicsPlugin,
-        allocator: std.mem.Allocator,
         _: ecs.Event(WindowDestroying),
     ) void {
-        if (self.device) |device| {
-            for (self.materials.items) |*material| {
-                material.sdlDeinit(device);
-                material.deinit(allocator);
-            }
-
-            var entity_lists = self.entities_by_mesh_id.valueIterator();
-            while (entity_lists.next()) |entities| entities.deinit(allocator);
-            self.entities_by_mesh_id.clearRetainingCapacity();
-
-            self.mesh_location_by_id.clearRetainingCapacity();
-            self.material_index_by_id.clearRetainingCapacity();
-            self.materials.clearRetainingCapacity();
-
-            if (self.sdl_window) |window| sdl.SDL_ReleaseWindowFromGPUDevice(device, window);
-            sdl.SDL_DestroyGPUDevice(device);
-            self.device = null;
+        if (self.sdl_window) |window| {
+            sdl.SDL_ReleaseWindowFromGPUDevice(self.device, window);
         }
         self.sdl_window = null;
     }
@@ -169,14 +164,13 @@ pub const GraphicsPlugin = struct {
         }
     }
 
-    pub fn uploadPendingMaterials(
+    pub fn registerPendingMaterials(
         self: *GraphicsPlugin,
         allocator: std.mem.Allocator,
         materials: ecs.Resource(Materials),
     ) void {
         if (materials.value.pending.items.len == 0) return;
-
-        const device = self.device orelse return;
+        if (self.swapchain_format == sdl.SDL_GPU_TEXTUREFORMAT_INVALID) return;
 
         defer materials.value.pending.clearRetainingCapacity();
 
@@ -186,22 +180,21 @@ pub const GraphicsPlugin = struct {
             const index: u32 = @intCast(self.materials.items.len);
 
             self.material_index_by_id.put(allocator, util.hashBytes(pending.id), index) catch
-                util.panicOom("GraphicsPlugin.uploadPendingMaterials");
+                util.panicOom("GraphicsPlugin.registerPendingMaterials");
             self.materials.append(
                 allocator,
-                Material.init(device, self.swapchain_format, pending.shader_data),
-            ) catch util.panicOom("GraphicsPlugin.uploadPendingMaterials");
+                Material.init(self.device, self.swapchain_format, pending.shader_data),
+            ) catch util.panicOom("GraphicsPlugin.registerPendingMaterials");
         }
     }
 
-    pub fn uploadPendingMeshes(
+    pub fn registerPendingMeshes(
         self: *GraphicsPlugin,
         allocator: std.mem.Allocator,
         meshes: ecs.Resource(Meshes),
     ) void {
         if (meshes.value.pending.items.len == 0) return;
-
-        const device = self.device orelse return;
+        if (self.swapchain_format == sdl.SDL_GPU_TEXTUREFORMAT_INVALID) return;
 
         defer meshes.value.pending.clearRetainingCapacity();
 
@@ -228,26 +221,24 @@ pub const GraphicsPlugin = struct {
 
             const material = &self.materials.items[material_index];
 
-            const vertex_offset = material.addVertices(device, pending_mesh.data.positions);
-            const gpu_mesh = GPUMesh.init(device, vertex_offset, pending_mesh.data.vertexCount());
+            const vertex_offset = material.addVertices(self.device, pending_mesh.data.positions);
+            const gpu_mesh = GPUMesh.init(self.device, vertex_offset, pending_mesh.data.vertexCount());
 
             const gpu_mesh_index = material.addGpuMesh(allocator, gpu_mesh);
 
             self.mesh_location_by_id.put(allocator, mesh_id, .{
                 .material = material_index,
                 .gpu_mesh = gpu_mesh_index,
-            }) catch util.panicOom("GraphicsPlugin.uploadPendingMeshes");
+            }) catch util.panicOom("GraphicsPlugin.registerPendingMeshes");
         }
     }
 
-    pub fn assignPendingInstances(
+    pub fn addPendingInstances(
         self: *GraphicsPlugin,
         allocator: std.mem.Allocator,
         mesh_instances: ecs.Query(&.{ MeshInstance, Transform }),
     ) void {
         if (self.entities_by_mesh_id.count() == 0) return;
-
-        const device = self.device orelse return;
 
         var mesh_ids: std.ArrayList(u64) = .empty;
         defer mesh_ids.deinit(allocator);
@@ -263,11 +254,11 @@ pub const GraphicsPlugin = struct {
                 const mesh_instance, const transform = mesh_instances.get(entity) catch continue;
 
                 mesh_instance.instance_index =
-                    gpu_mesh.addInstance(device, Instance{ .position = transform.position });
+                    gpu_mesh.addInstance(self.device, Instance{ .position = transform.position });
             }
 
             mesh_ids.append(allocator, entry.key_ptr.*) catch
-                util.panicOom("GraphicsPlugin.assignPendingInstances");
+                util.panicOom("GraphicsPlugin.addPendingInstances");
         }
 
         for (mesh_ids.items) |id| {
@@ -276,10 +267,8 @@ pub const GraphicsPlugin = struct {
         }
     }
 
-    pub fn uploadBuffers(self: *GraphicsPlugin) void {
-        const device = self.device orelse return;
-
-        const command_buffer = sdl.SDL_AcquireGPUCommandBuffer(device) orelse util.sdlPanic();
+    pub fn uploadDirtyBuffers(self: *GraphicsPlugin) void {
+        const command_buffer = sdl.SDL_AcquireGPUCommandBuffer(self.device) orelse util.sdlPanic();
         const copy_pass = sdl.SDL_BeginGPUCopyPass(command_buffer) orelse util.sdlPanic();
 
         for (self.materials.items) |*material| {
@@ -301,8 +290,6 @@ pub const GraphicsPlugin = struct {
         windows: ecs.Query(&.{Window}),
         cameras: ecs.Query(&.{ Camera, Transform, Active }),
     ) void {
-        if (self.device == null) return;
-
         var it = windows.iterator();
         const window = (it.next() orelse return)[0];
 
