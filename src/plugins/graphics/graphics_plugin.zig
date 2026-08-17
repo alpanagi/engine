@@ -19,6 +19,7 @@ const MeshInstance = @import("../../components/mesh_instance.zig").MeshInstance;
 const Transform = @import("../../components/transform.zig").Transform;
 const Window = @import("../window_plugin.zig").Window;
 const WindowDestroying = @import("../window_plugin.zig").WindowDestroying;
+const WindowPixelSizeChanged = @import("../window_plugin.zig").WindowPixelSizeChanged;
 
 const texture_format = sdl.SDL_GPU_TEXTUREFORMAT_R8G8B8A8_UNORM;
 const texture_width = 1280;
@@ -89,6 +90,7 @@ pub const GraphicsPlugin = struct {
         commands.addObserver(ecs.events.resource.added(Config), onConfigAdded, self);
         commands.addObserver(ecs.events.component.added(Window), onWindowCreate, self);
         commands.addObserver(ecs.EventId.from(WindowDestroying), onWindowDestroy, self);
+        commands.addObserver(ecs.EventId.from(WindowPixelSizeChanged), onWindowPixelSizeChanged, self);
         commands.addObserver(ecs.events.component.added(MeshInstance), onMeshInstanceAdded, self);
         commands.addObserver(ecs.events.component.destroying(MeshInstance), onMeshInstanceDestroying, self);
 
@@ -120,37 +122,11 @@ pub const GraphicsPlugin = struct {
             );
         }
 
-        self.sample_count = config.value.render.getSampleCount();
-
-        if (self.color_target) |texture| sdl.SDL_ReleaseGPUTexture(self.device, texture);
-        const color_target = sdl.SDL_CreateGPUTexture(self.device, &.{
-            .type = sdl.SDL_GPU_TEXTURETYPE_2D,
-            .usage = sdl.SDL_GPU_TEXTUREUSAGE_COLOR_TARGET,
-            .format = texture_format,
-            .width = texture_width,
-            .height = texture_height,
-            .layer_count_or_depth = 1,
-            .num_levels = 1,
-            .sample_count = self.sample_count,
-        }) orelse util.sdlPanic();
-        self.color_target = color_target;
-
-        if (self.resolve_target) |texture| sdl.SDL_ReleaseGPUTexture(self.device, texture);
-        self.resolve_target = null;
-
-        if (self.sample_count != sdl.SDL_GPU_SAMPLECOUNT_1) {
-            const resolve_target = sdl.SDL_CreateGPUTexture(self.device, &.{
-                .type = sdl.SDL_GPU_TEXTURETYPE_2D,
-                .usage = sdl.SDL_GPU_TEXTUREUSAGE_COLOR_TARGET,
-                .format = texture_format,
-                .width = texture_width,
-                .height = texture_height,
-                .layer_count_or_depth = 1,
-                .num_levels = 1,
-                .sample_count = sdl.SDL_GPU_SAMPLECOUNT_1,
-            }) orelse util.sdlPanic();
-            self.resolve_target = resolve_target;
-        }
+        self.recreateColorTargets(
+            config.value.render.getSampleCount(),
+            self.color_target_width,
+            self.color_target_height,
+        );
     }
 
     pub fn onWindowCreate(
@@ -164,6 +140,24 @@ pub const GraphicsPlugin = struct {
         }
 
         self.sdl_window = window.sdl_window;
+
+        var width: c_int = 0;
+        var height: c_int = 0;
+        if (!sdl.SDL_GetWindowSizeInPixels(window.sdl_window, &width, &height)) util.sdlPanic();
+        if (width <= 0 or height <= 0) return;
+
+        self.recreateColorTargets(self.sample_count, @intCast(width), @intCast(height));
+    }
+
+    pub fn onWindowPixelSizeChanged(
+        self: *GraphicsPlugin,
+        window_pixel_size_changed_event: ecs.Event(WindowPixelSizeChanged),
+    ) void {
+        self.recreateColorTargets(
+            self.sample_count,
+            window_pixel_size_changed_event.value.width,
+            window_pixel_size_changed_event.value.height,
+        );
     }
 
     pub fn onWindowDestroy(
@@ -470,5 +464,46 @@ pub const GraphicsPlugin = struct {
         }
 
         if (!sdl.SDL_SubmitGPUCommandBuffer(command_buffer)) util.sdlPanic();
+    }
+
+    fn recreateColorTargets(self: *GraphicsPlugin, sample_count: c_uint, width: u32, height: u32) void {
+        if (self.color_target != null and
+            self.sample_count == sample_count and
+            self.color_target_width == width and
+            self.color_target_height == height) return;
+
+        self.sample_count = sample_count;
+        self.color_target_width = width;
+        self.color_target_height = height;
+
+        if (self.color_target) |texture| sdl.SDL_ReleaseGPUTexture(self.device, texture);
+        const color_target = sdl.SDL_CreateGPUTexture(self.device, &.{
+            .type = sdl.SDL_GPU_TEXTURETYPE_2D,
+            .usage = sdl.SDL_GPU_TEXTUREUSAGE_COLOR_TARGET,
+            .format = texture_format,
+            .width = self.color_target_width,
+            .height = self.color_target_height,
+            .layer_count_or_depth = 1,
+            .num_levels = 1,
+            .sample_count = self.sample_count,
+        }) orelse util.sdlPanic();
+        self.color_target = color_target;
+
+        if (self.resolve_target) |texture| sdl.SDL_ReleaseGPUTexture(self.device, texture);
+        self.resolve_target = null;
+
+        if (self.sample_count != sdl.SDL_GPU_SAMPLECOUNT_1) {
+            const resolve_target = sdl.SDL_CreateGPUTexture(self.device, &.{
+                .type = sdl.SDL_GPU_TEXTURETYPE_2D,
+                .usage = sdl.SDL_GPU_TEXTUREUSAGE_COLOR_TARGET,
+                .format = texture_format,
+                .width = self.color_target_width,
+                .height = self.color_target_height,
+                .layer_count_or_depth = 1,
+                .num_levels = 1,
+                .sample_count = sdl.SDL_GPU_SAMPLECOUNT_1,
+            }) orelse util.sdlPanic();
+            self.resolve_target = resolve_target;
+        }
     }
 };

@@ -8,6 +8,10 @@ const Config = @import("../resources/config.zig").Config;
 const ShuttingDown = @import("../engine.zig").events.ShuttingDown;
 
 pub const WindowDestroying = struct {};
+pub const WindowPixelSizeChanged = struct {
+    width: u32,
+    height: u32,
+};
 
 pub const Window = struct {
     sdl_window: *sdl.SDL_Window,
@@ -95,6 +99,16 @@ pub const WindowPlugin = struct {
                     observers.trigger(WindowDestroying{});
                     observers.trigger(ShuttingDown{});
                     return;
+                },
+                sdl.SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED => {
+                    const width: c_int = event.window.data1;
+                    const height: c_int = event.window.data2;
+                    if (width <= 0 or height <= 0) continue;
+
+                    observers.trigger(WindowPixelSizeChanged{
+                        .width = @intCast(width),
+                        .height = @intCast(height),
+                    });
                 },
                 else => {},
             }
