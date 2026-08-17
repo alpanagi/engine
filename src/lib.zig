@@ -22,3 +22,7 @@ pub const math = struct {
     pub const Quat = quat.Quat;
     pub const Vec4 = vec4.Vec4;
 };
+
+pub const plugins = struct {
+    pub const FPSLoggingPlugin = @import("plugins/optional/fps_logging_plugin.zig").FPSLoggingPlugin;
+};

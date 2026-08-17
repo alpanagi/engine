@@ -2,6 +2,21 @@ const sdl = @import("sdl");
 const std = @import("std");
 const util = @import("util.zig");
 
+const AssetPlugin = @import("plugins/asset_plugin.zig").AssetPlugin;
+const ConfigPlugin = @import("plugins/config_plugin.zig").ConfigPlugin;
+const GraphicsPlugin = @import("plugins/graphics/graphics_plugin.zig").GraphicsPlugin;
+const TimePlugin = @import("plugins/time_plugin.zig").TimePlugin;
+const WindowPlugin = @import("plugins/window_plugin.zig").WindowPlugin;
+
+const AssetLoader = resources.AssetLoader;
+const Event = @import("ecs").Event;
+const EventId = @import("ecs").EventId;
+const Materials = resources.Materials;
+const Meshes = resources.Meshes;
+const ShuttingDown = events.ShuttingDown;
+const Time = resources.Time;
+const World = @import("ecs").World;
+
 pub const components = struct {
     pub const Active = @import("components/active.zig").Active;
     pub const Camera = @import("components/camera.zig").Camera;
@@ -24,14 +39,6 @@ pub const events = struct {
     pub const WindowDestroying = @import("plugins/window_plugin.zig").WindowDestroying;
 };
 
-const plugins = struct {
-    pub const AssetPlugin = @import("plugins/asset_plugin.zig").AssetPlugin;
-    pub const ConfigPlugin = @import("plugins/config_plugin.zig").ConfigPlugin;
-    pub const GraphicsPlugin = @import("plugins/graphics/graphics_plugin.zig").GraphicsPlugin;
-    pub const TimePlugin = @import("plugins/time_plugin.zig").TimePlugin;
-    pub const WindowPlugin = @import("plugins/window_plugin.zig").WindowPlugin;
-};
-
 pub const resources = struct {
     pub const AssetLoader = @import("resources/asset_loader/asset_loader.zig").AssetLoader;
     pub const Config = @import("resources/config.zig").Config;
@@ -39,20 +46,6 @@ pub const resources = struct {
     pub const Meshes = @import("resources/meshes.zig").Meshes;
     pub const Time = @import("resources/time.zig").Time;
 };
-
-const AssetLoader = resources.AssetLoader;
-const AssetPlugin = plugins.AssetPlugin;
-const ConfigPlugin = plugins.ConfigPlugin;
-const Event = @import("ecs").Event;
-const EventId = @import("ecs").EventId;
-const GraphicsPlugin = plugins.GraphicsPlugin;
-const Materials = resources.Materials;
-const Meshes = resources.Meshes;
-const ShuttingDown = events.ShuttingDown;
-const Time = resources.Time;
-const TimePlugin = plugins.TimePlugin;
-const WindowPlugin = plugins.WindowPlugin;
-const World = @import("ecs").World;
 
 pub const Engine = struct {
     pub const Options = struct {
