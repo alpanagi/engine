@@ -21,6 +21,8 @@ const Window = @import("../window_plugin.zig").Window;
 const WindowDestroying = @import("../window_plugin.zig").WindowDestroying;
 
 const texture_format = sdl.SDL_GPU_TEXTUREFORMAT_R8G8B8A8_UNORM;
+const texture_width = 1280;
+const texture_height = 720;
 
 const MeshLocation = struct {
     material: u32,
@@ -36,10 +38,12 @@ pub const GraphicsPlugin = struct {
     entities_by_mesh_id: std.AutoHashMapUnmanaged(u64, std.ArrayList(ecs.Entity)) = .empty,
 
     color_target: ?*sdl.SDL_GPUTexture = null,
-    color_target_width: u32 = 0,
-    color_target_height: u32 = 0,
+    resolve_target: ?*sdl.SDL_GPUTexture = null,
+    color_target_width: u32 = texture_width,
+    color_target_height: u32 = texture_height,
 
     clear_color: Color = Color.black,
+    sample_count: c_uint = sdl.SDL_GPU_SAMPLECOUNT_4,
 
     pub fn init() GraphicsPlugin {
         const device = sdl.SDL_CreateGPUDevice(
@@ -48,7 +52,9 @@ pub const GraphicsPlugin = struct {
             "vulkan",
         ) orelse util.sdlPanic();
 
-        return .{ .device = device };
+        return .{
+            .device = device,
+        };
     }
 
     pub fn deinit(self: *GraphicsPlugin, allocator: std.mem.Allocator) void {
@@ -70,7 +76,10 @@ pub const GraphicsPlugin = struct {
         }
         self.sdl_window = null;
 
-        if (self.color_target) |color_target| sdl.SDL_ReleaseGPUTexture(self.device, color_target);
+        if (self.color_target) |texture| sdl.SDL_ReleaseGPUTexture(self.device, texture);
+        if (self.resolve_target) |texture| sdl.SDL_ReleaseGPUTexture(self.device, texture);
+        self.color_target = null;
+        self.resolve_target = null;
         sdl.SDL_DestroyGPUDevice(self.device);
     }
 
@@ -88,6 +97,7 @@ pub const GraphicsPlugin = struct {
         commands.addSystem("post-update", addPendingInstances, self);
         commands.addSystem("post-update", uploadDirtyBuffers, self);
         commands.addSystem("post-update", draw, self);
+        commands.addSystem("post-update", present, self);
     }
 
     pub fn setup(_: *GraphicsPlugin, allocator: std.mem.Allocator, materials: ecs.Resource(Materials)) void {
@@ -101,10 +111,45 @@ pub const GraphicsPlugin = struct {
         config: ecs.Resource(Config),
         _: ecs.Event(ecs.events.ResourceAdded),
     ) void {
-        if (Color.fromHex(config.value.clear_color)) |color| {
+        if (config.value.render.getClearColor()) |color| {
             self.clear_color = color;
         } else |err| {
-            std.log.err("invalid clear color {s}: {t}", .{ config.value.clear_color, err });
+            std.log.err(
+                "invalid clear color {s}: {t}",
+                .{ config.value.render.clear_color, err },
+            );
+        }
+
+        self.sample_count = config.value.render.getSampleCount();
+
+        if (self.color_target) |texture| sdl.SDL_ReleaseGPUTexture(self.device, texture);
+        const color_target = sdl.SDL_CreateGPUTexture(self.device, &.{
+            .type = sdl.SDL_GPU_TEXTURETYPE_2D,
+            .usage = sdl.SDL_GPU_TEXTUREUSAGE_COLOR_TARGET,
+            .format = texture_format,
+            .width = texture_width,
+            .height = texture_height,
+            .layer_count_or_depth = 1,
+            .num_levels = 1,
+            .sample_count = self.sample_count,
+        }) orelse util.sdlPanic();
+        self.color_target = color_target;
+
+        if (self.resolve_target) |texture| sdl.SDL_ReleaseGPUTexture(self.device, texture);
+        self.resolve_target = null;
+
+        if (self.sample_count != sdl.SDL_GPU_SAMPLECOUNT_1) {
+            const resolve_target = sdl.SDL_CreateGPUTexture(self.device, &.{
+                .type = sdl.SDL_GPU_TEXTURETYPE_2D,
+                .usage = sdl.SDL_GPU_TEXTUREUSAGE_COLOR_TARGET,
+                .format = texture_format,
+                .width = texture_width,
+                .height = texture_height,
+                .layer_count_or_depth = 1,
+                .num_levels = 1,
+                .sample_count = sdl.SDL_GPU_SAMPLECOUNT_1,
+            }) orelse util.sdlPanic();
+            self.resolve_target = resolve_target;
         }
     }
 
@@ -205,7 +250,12 @@ pub const GraphicsPlugin = struct {
                 util.panicOom("GraphicsPlugin.registerPendingMaterials");
             self.materials.append(
                 allocator,
-                Material.init(self.device, texture_format, pending.shader_data),
+                Material.init(
+                    self.device,
+                    texture_format,
+                    pending.shader_data,
+                    self.sample_count,
+                ),
             ) catch util.panicOom("GraphicsPlugin.registerPendingMaterials");
         }
     }
@@ -307,12 +357,85 @@ pub const GraphicsPlugin = struct {
 
     pub fn draw(
         self: *GraphicsPlugin,
+        cameras: ecs.Query(&.{ Camera, Transform, Active }),
+    ) void {
+        if (self.color_target == null) return;
+        if (self.sample_count != sdl.SDL_GPU_SAMPLECOUNT_1 and self.resolve_target == null) return;
+        const camera, const camera_transform, _ = cameras.first() orelse return;
+
+        const command_buffer = sdl.SDL_AcquireGPUCommandBuffer(self.device) orelse util.sdlPanic();
+
+        const aspect = @as(f32, @floatFromInt(self.color_target_width)) /
+            @as(f32, @floatFromInt(self.color_target_height));
+
+        const view_projection_matrix = mat4.mul(
+            view_projection.perspective(camera.fov_y, aspect, camera.near, camera.far),
+            view_projection.viewFromTransform(camera_transform.position, camera_transform.rotation),
+        );
+
+        sdl.SDL_PushGPUVertexUniformData(
+            command_buffer,
+            0,
+            &view_projection_matrix,
+            @sizeOf(mat4.Mat4),
+        );
+
+        const color_target_info = sdl.SDL_GPUColorTargetInfo{
+            .texture = self.color_target.?,
+            .clear_color = sdl.SDL_FColor{
+                .r = self.clear_color.r,
+                .g = self.clear_color.g,
+                .b = self.clear_color.b,
+                .a = self.clear_color.a,
+            },
+            .load_op = sdl.SDL_GPU_LOADOP_CLEAR,
+            .store_op = if (self.sample_count != sdl.SDL_GPU_SAMPLECOUNT_1) sdl.SDL_GPU_STOREOP_RESOLVE else sdl.SDL_GPU_STOREOP_STORE,
+            .resolve_texture = if (self.sample_count != sdl.SDL_GPU_SAMPLECOUNT_1) self.resolve_target.? else null,
+            .cycle = false,
+        };
+        const render_pass = sdl.SDL_BeginGPURenderPass(command_buffer, &color_target_info, 1, null);
+
+        for (self.materials.items) |material| {
+            const vertex_buffer = material.vertex_buffer orelse continue;
+
+            sdl.SDL_BindGPUGraphicsPipeline(render_pass, material.pipeline);
+
+            const binding = sdl.SDL_GPUBufferBinding{
+                .buffer = vertex_buffer.buffer,
+                .offset = 0,
+            };
+            sdl.SDL_BindGPUVertexBuffers(render_pass, 0, &binding, 1);
+
+            for (material.gpu_meshes.items) |gpu_mesh| {
+                const instance_buffer: *sdl.SDL_GPUBuffer = gpu_mesh.instance_buffer.buffer;
+                sdl.SDL_BindGPUVertexStorageBuffers(render_pass, 0, &instance_buffer, 1);
+
+                sdl.SDL_DrawGPUPrimitives(
+                    render_pass,
+                    gpu_mesh.vertex_count,
+                    gpu_mesh.instance_buffer.count,
+                    gpu_mesh.vertex_offset,
+                    0,
+                );
+            }
+        }
+
+        sdl.SDL_EndGPURenderPass(render_pass);
+
+        if (!sdl.SDL_SubmitGPUCommandBuffer(command_buffer)) util.sdlPanic();
+    }
+
+    pub fn present(
+        self: *GraphicsPlugin,
         windows: ecs.Query(&.{Window}),
         cameras: ecs.Query(&.{ Camera, Transform, Active }),
     ) void {
+        if (self.color_target == null) return;
+        if (self.sample_count != sdl.SDL_GPU_SAMPLECOUNT_1 and self.resolve_target == null) return;
+
         var it = windows.iterator();
         const window = (it.next() orelse return)[0];
-        const camera, const camera_transform, _ = cameras.first() orelse return;
+        _ = cameras.first() orelse return;
 
         const command_buffer = sdl.SDL_AcquireGPUCommandBuffer(self.device) orelse util.sdlPanic();
 
@@ -329,91 +452,15 @@ pub const GraphicsPlugin = struct {
             util.sdlPanic();
         }
 
-        if (swapchain_texture) |texture| {
-            if (self.color_target_width != swapchain_texture_width or
-                self.color_target_height != swapchain_texture_height)
-            {
-                if (self.color_target) |color_target| sdl.SDL_ReleaseGPUTexture(self.device, color_target);
-
-                self.color_target = sdl.SDL_CreateGPUTexture(self.device, &.{
-                    .type = sdl.SDL_GPU_TEXTURETYPE_2D,
-                    .usage = sdl.SDL_GPU_TEXTUREUSAGE_COLOR_TARGET,
-                    .format = texture_format,
-                    .width = swapchain_texture_width,
-                    .height = swapchain_texture_height,
-                    .layer_count_or_depth = 1,
-                    .num_levels = 1,
-                    .sample_count = sdl.SDL_GPU_SAMPLECOUNT_1,
-                }) orelse util.sdlPanic();
-
-                self.color_target_width = swapchain_texture_width;
-                self.color_target_height = swapchain_texture_height;
-            }
-
-            const aspect = @as(f32, @floatFromInt(swapchain_texture_width)) /
-                @as(f32, @floatFromInt(swapchain_texture_height));
-
-            const view_projection_matrix = mat4.mul(
-                view_projection.perspective(camera.fov_y, aspect, camera.near, camera.far),
-                view_projection.viewFromTransform(camera_transform.position, camera_transform.rotation),
-            );
-
-            sdl.SDL_PushGPUVertexUniformData(
-                command_buffer,
-                0,
-                &view_projection_matrix,
-                @sizeOf(mat4.Mat4),
-            );
-
-            const color_target_info = sdl.SDL_GPUColorTargetInfo{
-                .texture = self.color_target.?,
-                .clear_color = sdl.SDL_FColor{
-                    .r = self.clear_color.r,
-                    .g = self.clear_color.g,
-                    .b = self.clear_color.b,
-                    .a = self.clear_color.a,
-                },
-                .load_op = sdl.SDL_GPU_LOADOP_CLEAR,
-                .store_op = sdl.SDL_GPU_STOREOP_STORE,
-                .cycle = false,
-            };
-            const render_pass = sdl.SDL_BeginGPURenderPass(command_buffer, &color_target_info, 1, null);
-
-            for (self.materials.items) |material| {
-                const vertex_buffer = material.vertex_buffer orelse continue;
-
-                sdl.SDL_BindGPUGraphicsPipeline(render_pass, material.pipeline);
-
-                const binding = sdl.SDL_GPUBufferBinding{
-                    .buffer = vertex_buffer.buffer,
-                    .offset = 0,
-                };
-                sdl.SDL_BindGPUVertexBuffers(render_pass, 0, &binding, 1);
-
-                for (material.gpu_meshes.items) |gpu_mesh| {
-                    const instance_buffer: *sdl.SDL_GPUBuffer = gpu_mesh.instance_buffer.buffer;
-                    sdl.SDL_BindGPUVertexStorageBuffers(render_pass, 0, &instance_buffer, 1);
-
-                    sdl.SDL_DrawGPUPrimitives(
-                        render_pass,
-                        gpu_mesh.vertex_count,
-                        gpu_mesh.instance_buffer.count,
-                        gpu_mesh.vertex_offset,
-                        0,
-                    );
-                }
-            }
-
-            sdl.SDL_EndGPURenderPass(render_pass);
-
+        if (swapchain_texture != null) {
             sdl.SDL_BlitGPUTexture(command_buffer, &.{
                 .source = .{
-                    .texture = self.color_target.?,
-                    .w = swapchain_texture_width,
-                    .h = swapchain_texture_height,
+                    .texture = if (self.sample_count != sdl.SDL_GPU_SAMPLECOUNT_1) self.resolve_target.? else self.color_target.?,
+                    .w = self.color_target_width,
+                    .h = self.color_target_height,
                 },
                 .destination = .{
-                    .texture = texture,
+                    .texture = swapchain_texture,
                     .w = swapchain_texture_width,
                     .h = swapchain_texture_height,
                 },

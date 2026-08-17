@@ -15,8 +15,9 @@ pub const Material = struct {
 
     pub fn init(
         device: *sdl.SDL_GPUDevice,
-        swapchain_format: sdl.SDL_GPUTextureFormat,
+        texture_format: sdl.SDL_GPUTextureFormat,
         shader_data: []const u8,
+        sample_count: c_uint,
     ) Material {
         const vertex_shader = createShader(
             device,
@@ -58,7 +59,7 @@ pub const Material = struct {
             .enable_depth_clip = false,
         };
         const multisample_state = sdl.SDL_GPUMultisampleState{
-            .sample_count = sdl.SDL_GPU_SAMPLECOUNT_1,
+            .sample_count = sample_count,
             .enable_alpha_to_coverage = false,
         };
         const depth_stencil_state = sdl.SDL_GPUDepthStencilState{
@@ -80,7 +81,7 @@ pub const Material = struct {
             .enable_color_write_mask = false,
         };
         const target_description = sdl.SDL_GPUColorTargetDescription{
-            .format = swapchain_format,
+            .format = texture_format,
             .blend_state = target_blend_state,
         };
         const target_info = sdl.SDL_GPUGraphicsPipelineTargetInfo{
