@@ -74,24 +74,24 @@ pub const Engine = struct {
         io: std.Io,
         options: Options,
     ) void {
-        world.addResourceOwned(
+        world.addOwnedResource(
             allocator,
             AssetLoader,
             AssetLoader.init(allocator, io, .{
                 .working_directory = options.working_directory,
             }),
         );
-        world.addResourceOwned(allocator, Time, Time.init(io));
-        world.addResourceOwned(allocator, Materials, .{});
-        world.addResourceOwned(allocator, Meshes, .{});
+        world.addOwnedResource(allocator, Time, Time.init(io));
+        world.addOwnedResource(allocator, Materials, .{});
+        world.addOwnedResource(allocator, Meshes, .{});
     }
 
     fn addPlugins(world: *World, allocator: std.mem.Allocator) void {
-        world.addPluginOwned(allocator, TimePlugin{});
-        world.addPluginOwned(allocator, ConfigPlugin{});
-        world.addPluginOwned(allocator, AssetPlugin{});
-        world.addPluginOwned(allocator, GraphicsPlugin.init());
-        world.addPluginOwned(allocator, WindowPlugin{});
+        world.addOwnedPlugin(allocator, TimePlugin{});
+        world.addOwnedPlugin(allocator, ConfigPlugin{});
+        world.addOwnedPlugin(allocator, AssetPlugin{});
+        world.addOwnedPlugin(allocator, GraphicsPlugin.init());
+        world.addOwnedPlugin(allocator, WindowPlugin{});
     }
 
     pub fn deinit(self: *Engine, allocator: std.mem.Allocator) void {
