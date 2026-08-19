@@ -80,7 +80,7 @@ pub const WindowPlugin = struct {
     ) void {
         const icon = asset_loader.value.loadImage(allocator, config.value.window.icon) catch null;
         const window = Window.init(allocator, config.value.window.title, icon, 1280, 720);
-        commands.spawn(.{window});
+        commands.spawnOwned(.{window});
     }
 
     pub fn readSDLWindowEvents(

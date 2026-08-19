@@ -17,6 +17,6 @@ pub const ConfigPlugin = struct {
     ) void {
         const config = asset_loader.value.loadToml(allocator, Config, "project.toml") catch
             Config.default(allocator);
-        commands.addResource(Config, config);
+        commands.addResourceOwned(Config, config);
     }
 };

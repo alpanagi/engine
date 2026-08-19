@@ -74,24 +74,24 @@ pub const Engine = struct {
         io: std.Io,
         options: Options,
     ) void {
-        world.addResource(
+        world.addResourceOwned(
             allocator,
             AssetLoader,
             AssetLoader.init(allocator, io, .{
                 .working_directory = options.working_directory,
             }),
         );
-        world.addResource(allocator, Time, Time.init(io));
-        world.addResource(allocator, Materials, .{});
-        world.addResource(allocator, Meshes, .{});
+        world.addResourceOwned(allocator, Time, Time.init(io));
+        world.addResourceOwned(allocator, Materials, .{});
+        world.addResourceOwned(allocator, Meshes, .{});
     }
 
     fn addPlugins(world: *World, allocator: std.mem.Allocator) void {
-        world.addPlugin(allocator, TimePlugin);
-        world.addPlugin(allocator, ConfigPlugin);
-        world.addPlugin(allocator, AssetPlugin);
-        world.addPlugin(allocator, GraphicsPlugin);
-        world.addPlugin(allocator, WindowPlugin);
+        world.addPluginOwned(allocator, TimePlugin{});
+        world.addPluginOwned(allocator, ConfigPlugin{});
+        world.addPluginOwned(allocator, AssetPlugin{});
+        world.addPluginOwned(allocator, GraphicsPlugin.init());
+        world.addPluginOwned(allocator, WindowPlugin{});
     }
 
     pub fn deinit(self: *Engine, allocator: std.mem.Allocator) void {
