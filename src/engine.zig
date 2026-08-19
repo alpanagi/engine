@@ -99,6 +99,19 @@ pub const Engine = struct {
         sdl.SDL_Quit();
     }
 
+    pub fn addOwnedPlugin(self: *Engine, allocator: std.mem.Allocator, plugin: anytype) void {
+        self.world.addOwnedPlugin(allocator, plugin);
+    }
+
+    pub fn addOwnedResource(
+        self: *Engine,
+        allocator: std.mem.Allocator,
+        comptime T: type,
+        value: T,
+    ) void {
+        self.world.addOwnedResource(allocator, T, value);
+    }
+
     pub fn run(self: *Engine, allocator: std.mem.Allocator) void {
         self.world.addObserver(allocator, EventId.from(ShuttingDown), onShutdown, self);
 
