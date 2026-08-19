@@ -13,6 +13,13 @@ pub const Query = @import("ecs").Query;
 pub const Resource = @import("ecs").Resource;
 pub const World = @import("ecs").World;
 
+pub const gltf = struct {
+    pub const Gltf = @import("gltf").Gltf;
+    pub const GltfError = @import("gltf").GltfError;
+    pub const Mesh = @import("gltf").Mesh;
+    pub const Primitive = @import("gltf").Primitive;
+};
+
 pub const math = struct {
     pub const mat4 = @import("math/mat4.zig");
     pub const quat = @import("math/quat.zig");

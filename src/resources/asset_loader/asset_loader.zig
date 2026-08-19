@@ -1,3 +1,4 @@
+const gltf = @import("gltf");
 const obj = @import("parsers/obj.zig");
 const sdl = @import("sdl");
 const sdl_image = @import("sdl_image");
@@ -101,6 +102,17 @@ pub const AssetLoader = struct {
             util.panicOom("AssetLoader.takeCompletedFiles");
     }
 
+    pub fn loadGlb(
+        self: *AssetLoader,
+        allocator: std.mem.Allocator,
+        path: []const u8,
+    ) !gltf.Gltf {
+        const bytes = try self.readBinaryFileAlloc(allocator, path);
+        defer allocator.free(bytes);
+
+        return self.parseGlb(allocator, bytes);
+    }
+
     pub fn loadImage(
         self: *AssetLoader,
         allocator: std.mem.Allocator,
@@ -140,6 +152,14 @@ pub const AssetLoader = struct {
         defer allocator.free(text);
 
         return self.parseToml(allocator, T, text);
+    }
+
+    pub fn parseGlb(
+        _: *AssetLoader,
+        allocator: std.mem.Allocator,
+        bytes: []const u8,
+    ) !gltf.Gltf {
+        return gltf.parseAlloc(allocator, bytes);
     }
 
     pub fn parseObj(

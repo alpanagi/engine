@@ -16,6 +16,10 @@
             .url = "https://github.com/alpanagi/shaders/releases/download/v0.0.0/shaders-v0.0.0.tar.gz",
             .hash = "shaders-0.0.0-OlY1ry-QAAB1E4duQVx90HZSh6unv98dWPzavwlwgryN",
         },
+        .gltf = .{
+            .url = "git+https://github.com/alpanagi/gltf.git#24ef506942e293dcf95ea80599d4f6d0d24723d6",
+            .hash = "gltf-0.0.0-qgf4ubD7AABFDA8JQPA4O6LiedJUTi4aaMTbTz7fSLEY",
+        },
     },
     .paths = .{
         "build.zig",
