@@ -9,8 +9,8 @@ pub const FPSLoggingPlugin = struct {
     timestamp: Timestamp = .zero,
     rendered_frames: u32 = 0,
 
-    pub fn build(self: *FPSLoggingPlugin, commands: Commands) void {
-        commands.addSystem("update", update, self);
+    pub fn build(self: *FPSLoggingPlugin, allocator: std.mem.Allocator, commands: Commands) void {
+        commands.addSystem(allocator, "update", update, self);
     }
 
     pub fn update(self: *FPSLoggingPlugin, time: Resource(Time)) void {

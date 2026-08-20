@@ -5,7 +5,7 @@ const util = @import("../util.zig");
 
 const AssetLoader = @import("../resources/asset_loader/asset_loader.zig").AssetLoader;
 const Config = @import("../resources/config.zig").Config;
-const ShuttingDown = @import("../engine.zig").events.ShuttingDown;
+const ShuttingDown = @import("../engine.zig").ShuttingDown;
 
 pub const WindowDestroying = struct {};
 pub const WindowPixelSizeChanged = struct {
@@ -65,9 +65,9 @@ pub const WindowPlugin = struct {
         if (self.icon) |icon| sdl.SDL_DestroySurface(icon);
     }
 
-    pub fn build(self: *WindowPlugin, commands: ecs.Commands) void {
-        commands.addObserver(ecs.events.resource.added(Config), onConfigAdded, self);
-        commands.addSystem("update", readSDLWindowEvents, self);
+    pub fn build(self: *WindowPlugin, allocator: std.mem.Allocator, commands: ecs.Commands) void {
+        commands.addObserver(allocator, ecs.events.resource.added(Config), onConfigAdded, self);
+        commands.addSystem(allocator, "update", readSDLWindowEvents, self);
     }
 
     pub fn onConfigAdded(
@@ -80,11 +80,12 @@ pub const WindowPlugin = struct {
     ) void {
         const icon = asset_loader.value.loadImage(allocator, config.value.window.icon) catch null;
         const window = Window.init(allocator, config.value.window.title, icon, 1280, 720);
-        commands.spawnOwned(.{window});
+        commands.spawnOwned(allocator, .{window});
     }
 
     pub fn readSDLWindowEvents(
         _: *WindowPlugin,
+        allocator: std.mem.Allocator,
         observers: ecs.Observers,
         windows: ecs.Query(&.{Window}),
     ) void {
@@ -96,8 +97,8 @@ pub const WindowPlugin = struct {
                 sdl.SDL_EVENT_QUIT,
                 sdl.SDL_EVENT_WINDOW_CLOSE_REQUESTED,
                 => {
-                    observers.trigger(WindowDestroying{});
-                    observers.trigger(ShuttingDown{});
+                    observers.dispatchOwnedEvent(allocator, WindowDestroying{});
+                    observers.dispatchOwnedEvent(allocator, ShuttingDown{});
                     return;
                 },
                 sdl.SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED => {
@@ -105,7 +106,7 @@ pub const WindowPlugin = struct {
                     const height: c_int = event.window.data2;
                     if (width <= 0 or height <= 0) continue;
 
-                    observers.trigger(WindowPixelSizeChanged{
+                    observers.dispatchOwnedEvent(allocator, WindowPixelSizeChanged{
                         .width = @intCast(width),
                         .height = @intCast(height),
                     });

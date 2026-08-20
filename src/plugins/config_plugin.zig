@@ -5,8 +5,8 @@ const AssetLoader = @import("../resources/asset_loader/asset_loader.zig").AssetL
 const Config = @import("../resources/config.zig").Config;
 
 pub const ConfigPlugin = struct {
-    pub fn build(self: *ConfigPlugin, commands: ecs.Commands) void {
-        commands.addOneShotSystem(setup, self);
+    pub fn build(self: *ConfigPlugin, allocator: std.mem.Allocator, commands: ecs.Commands) void {
+        commands.addOneShotSystem(allocator, setup, self);
     }
 
     pub fn setup(
@@ -17,6 +17,6 @@ pub const ConfigPlugin = struct {
     ) void {
         const config = asset_loader.value.loadToml(allocator, Config, "project.toml") catch
             Config.default(allocator);
-        commands.addOwnedResource(Config, config);
+        commands.addOwnedResource(allocator, Config, config);
     }
 };

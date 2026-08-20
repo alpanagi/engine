@@ -5,8 +5,8 @@ const Commands = @import("ecs").Commands;
 const Resource = @import("ecs").Resource;
 
 pub const AssetPlugin = struct {
-    pub fn build(self: *AssetPlugin, commands: Commands) void {
-        commands.addSystem("pre-update", consumeCompletedFiles, self);
+    pub fn build(self: *AssetPlugin, allocator: std.mem.Allocator, commands: Commands) void {
+        commands.addSystem(allocator, "pre-update", consumeCompletedFiles, self);
     }
 
     pub fn consumeCompletedFiles(

@@ -52,4 +52,19 @@ pub fn build(b: *std.Build) void {
     engine_lib.addImport("shaders", shaders);
     engine_lib.addImport("toml", toml);
     engine_lib.addImport("gltf", gltf);
+
+    const tests = b.addTest(.{
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("test/root.zig"),
+            .target = target,
+            .optimize = optimize,
+            .link_libc = true,
+        }),
+    });
+
+    tests.root_module.addImport("engine", engine_lib);
+    tests.root_module.linkSystemLibrary("SDL3", .{});
+    tests.root_module.linkSystemLibrary("SDL3_image", .{});
+
+    b.step("test", "Run the integration tests").dependOn(&b.addRunArtifact(tests).step);
 }

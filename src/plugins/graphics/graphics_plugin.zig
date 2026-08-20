@@ -84,22 +84,22 @@ pub const GraphicsPlugin = struct {
         sdl.SDL_DestroyGPUDevice(self.device);
     }
 
-    pub fn build(self: *GraphicsPlugin, commands: ecs.Commands) void {
-        commands.addOneShotSystem(setup, self);
+    pub fn build(self: *GraphicsPlugin, allocator: std.mem.Allocator, commands: ecs.Commands) void {
+        commands.addOneShotSystem(allocator, setup, self);
 
-        commands.addObserver(ecs.events.resource.added(Config), onConfigAdded, self);
-        commands.addObserver(ecs.events.component.added(Window), onWindowCreate, self);
-        commands.addObserver(ecs.EventId.from(WindowDestroying), onWindowDestroy, self);
-        commands.addObserver(ecs.EventId.from(WindowPixelSizeChanged), onWindowPixelSizeChanged, self);
-        commands.addObserver(ecs.events.component.added(MeshInstance), onMeshInstanceAdded, self);
-        commands.addObserver(ecs.events.component.destroying(MeshInstance), onMeshInstanceDestroying, self);
+        commands.addObserver(allocator, ecs.events.resource.added(Config), onConfigAdded, self);
+        commands.addObserver(allocator, ecs.events.component.added(Window), onWindowCreate, self);
+        commands.addObserver(allocator, ecs.EventId.from(WindowDestroying), onWindowDestroy, self);
+        commands.addObserver(allocator, ecs.EventId.from(WindowPixelSizeChanged), onWindowPixelSizeChanged, self);
+        commands.addObserver(allocator, ecs.events.component.added(MeshInstance), onMeshInstanceAdded, self);
+        commands.addObserver(allocator, ecs.events.component.destroying(MeshInstance), onMeshInstanceDestroying, self);
 
-        commands.addSystem("post-update", registerPendingMaterials, self);
-        commands.addSystem("post-update", registerPendingMeshes, self);
-        commands.addSystem("post-update", addPendingInstances, self);
-        commands.addSystem("post-update", uploadDirtyBuffers, self);
-        commands.addSystem("post-update", draw, self);
-        commands.addSystem("post-update", present, self);
+        commands.addSystem(allocator, "post-update", registerPendingMaterials, self);
+        commands.addSystem(allocator, "post-update", registerPendingMeshes, self);
+        commands.addSystem(allocator, "post-update", addPendingInstances, self);
+        commands.addSystem(allocator, "post-update", uploadDirtyBuffers, self);
+        commands.addSystem(allocator, "post-update", draw, self);
+        commands.addSystem(allocator, "post-update", present, self);
     }
 
     pub fn setup(_: *GraphicsPlugin, allocator: std.mem.Allocator, materials: ecs.Resource(Materials)) void {
