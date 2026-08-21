@@ -61,7 +61,7 @@ pub const Engine = struct {
 
     pub fn run(self: *Engine, allocator: std.mem.Allocator) void {
         const observers = Observers.fromWorld(allocator, &self.world);
-        observers.addObserver(allocator, EventId.from(ShuttingDown), onShutdown, self);
+        observers.add(allocator, EventId.from(ShuttingDown), onShutdown, self);
 
         while (!self.has_received_termination_request) {
             self.world.runSystems(allocator);

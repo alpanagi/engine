@@ -25,7 +25,7 @@ test "dispatchOwnedEvent: holds the event until the duration elapses" {
     };
     State.fired = 0;
 
-    engine.Observers.fromWorld(allocator, &world).addObserver(allocator, engine.EventId.from(Plain), struct {
+    engine.Observers.fromWorld(allocator, &world).add(allocator, engine.EventId.from(Plain), struct {
         fn call(event: engine.Event(Plain)) void {
             State.fired += event.value.value;
         }
@@ -61,7 +61,7 @@ test "tick: fires every timer that expires in the same tick" {
     };
     State.total = 0;
 
-    engine.Observers.fromWorld(allocator, &world).addObserver(allocator, engine.EventId.from(Plain), struct {
+    engine.Observers.fromWorld(allocator, &world).add(allocator, engine.EventId.from(Plain), struct {
         fn call(event: engine.Event(Plain)) void {
             State.total += event.value.value;
         }
@@ -108,7 +108,7 @@ test "tick: an observer can schedule another timer while being dispatched" {
     State.first = 0;
     State.second = 0;
 
-    engine.Observers.fromWorld(allocator, &world).addObserver(allocator, engine.EventId.from(Plain), struct {
+    engine.Observers.fromWorld(allocator, &world).add(allocator, engine.EventId.from(Plain), struct {
         fn call(_: engine.Event(Plain)) void {
             State.first += 1;
             State.timers_ptr.dispatchOwnedEvent(
@@ -119,7 +119,7 @@ test "tick: an observer can schedule another timer while being dispatched" {
         }
     }.call, null);
 
-    engine.Observers.fromWorld(allocator, &world).addObserver(allocator, engine.EventId.from(Second), struct {
+    engine.Observers.fromWorld(allocator, &world).add(allocator, engine.EventId.from(Second), struct {
         fn call(_: engine.Event(Second)) void {
             State.second += 1;
         }
@@ -189,7 +189,7 @@ test "dispatchOwnedEvent: a timer never fires in the frame it was created" {
     };
     State.fired = 0;
 
-    engine.Observers.fromWorld(allocator, &world).addObserver(allocator, engine.EventId.from(Plain), struct {
+    engine.Observers.fromWorld(allocator, &world).add(allocator, engine.EventId.from(Plain), struct {
         fn call(event: engine.Event(Plain)) void {
             State.fired += event.value.value;
         }

@@ -95,21 +95,21 @@ pub const GraphicsPlugin = struct {
         resources.addOwned(allocator, Materials, .{});
         resources.addOwned(allocator, Meshes, .{});
 
-        one_shots.addSystem(allocator, setup, self);
+        one_shots.add(allocator, setup, self);
 
-        observers.addObserver(allocator, ecs.events.resource.added(Config), onConfigAdded, self);
-        observers.addObserver(allocator, ecs.events.component.added(Window), onWindowCreate, self);
-        observers.addObserver(allocator, ecs.EventId.from(WindowDestroying), onWindowDestroy, self);
-        observers.addObserver(allocator, ecs.EventId.from(WindowPixelSizeChanged), onWindowPixelSizeChanged, self);
-        observers.addObserver(allocator, ecs.events.component.added(MeshInstance), onMeshInstanceAdded, self);
-        observers.addObserver(allocator, ecs.events.component.destroying(MeshInstance), onMeshInstanceDestroying, self);
+        observers.add(allocator, ecs.events.resource.added(Config), onConfigAdded, self);
+        observers.add(allocator, ecs.events.component.added(Window), onWindowCreate, self);
+        observers.add(allocator, ecs.EventId.from(WindowDestroying), onWindowDestroy, self);
+        observers.add(allocator, ecs.EventId.from(WindowPixelSizeChanged), onWindowPixelSizeChanged, self);
+        observers.add(allocator, ecs.events.component.added(MeshInstance), onMeshInstanceAdded, self);
+        observers.add(allocator, ecs.events.component.destroying(MeshInstance), onMeshInstanceDestroying, self);
 
-        systems.addSystem(allocator, "post_update", registerPendingMaterials, self);
-        systems.addSystem(allocator, "post_update", registerPendingMeshes, self);
-        systems.addSystem(allocator, "post_update", addPendingInstances, self);
-        systems.addSystem(allocator, "post_update", uploadDirtyBuffers, self);
-        systems.addSystem(allocator, "post_update", draw, self);
-        systems.addSystem(allocator, "post_update", present, self);
+        systems.add(allocator, "post_update", registerPendingMaterials, self);
+        systems.add(allocator, "post_update", registerPendingMeshes, self);
+        systems.add(allocator, "post_update", addPendingInstances, self);
+        systems.add(allocator, "post_update", uploadDirtyBuffers, self);
+        systems.add(allocator, "post_update", draw, self);
+        systems.add(allocator, "post_update", present, self);
     }
 
     pub fn setup(_: *GraphicsPlugin, allocator: std.mem.Allocator, materials: ecs.Resource(Materials)) void {

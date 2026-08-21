@@ -6,7 +6,7 @@ const Config = @import("../resources/config.zig").Config;
 
 pub const ConfigPlugin = struct {
     pub fn build(self: *ConfigPlugin, allocator: std.mem.Allocator, one_shots: ecs.OneShots) void {
-        one_shots.addSystem(allocator, setup, self);
+        one_shots.add(allocator, setup, self);
     }
 
     pub fn setup(

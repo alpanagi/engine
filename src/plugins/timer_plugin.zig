@@ -14,8 +14,8 @@ pub const TimerPlugin = struct {
         resources.addOwned(allocator, Timers, .{});
 
         systems.addGroupBefore(allocator, "one_shots", "timing");
-        systems.addSystem(allocator, "timing", beginFrame, self);
-        systems.addSystem(allocator, "pre_update", tick, self);
+        systems.add(allocator, "timing", beginFrame, self);
+        systems.add(allocator, "pre_update", tick, self);
     }
 
     pub fn beginFrame(_: *TimerPlugin, timers: ecs.Resource(Timers)) void {

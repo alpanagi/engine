@@ -19,7 +19,7 @@ const Seen = struct {
 
 const ConsumerPlugin = struct {
     pub fn build(self: *ConsumerPlugin, allocator: std.mem.Allocator, one_shots: engine.OneShots) void {
-        one_shots.addSystem(allocator, setup, self);
+        one_shots.add(allocator, setup, self);
     }
 
     pub fn setup(_: *ConsumerPlugin, provided: engine.Resource(Provided)) void {

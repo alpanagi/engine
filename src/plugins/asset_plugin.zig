@@ -33,7 +33,7 @@ pub const AssetPlugin = struct {
         resources.addOwned(allocator, AssetLoader, AssetLoader.init(allocator, self.io, .{
             .working_directory = self.working_directory,
         }));
-        systems.addSystem(allocator, "pre_update", consumeCompletedFiles, self);
+        systems.add(allocator, "pre_update", consumeCompletedFiles, self);
     }
 
     pub fn consumeCompletedFiles(

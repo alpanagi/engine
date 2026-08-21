@@ -13,7 +13,7 @@ pub const TimePlugin = struct {
         systems: ecs.Systems,
     ) void {
         resources.addOwned(allocator, Time, Time.init(self.io));
-        systems.addSystem(allocator, "pre_update", tick, self);
+        systems.add(allocator, "pre_update", tick, self);
     }
 
     pub fn tick(_: *TimePlugin, time: ecs.Resource(Time)) void {
