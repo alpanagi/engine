@@ -5,8 +5,21 @@ const Time = @import("../resources/time.zig").Time;
 const Timers = @import("../resources/timers.zig").Timers;
 
 pub const TimerPlugin = struct {
-    pub fn build(self: *TimerPlugin, allocator: std.mem.Allocator, commands: ecs.Commands) void {
-        commands.addSystem(allocator, "pre-update", tick, self);
+    pub fn build(
+        self: *TimerPlugin,
+        allocator: std.mem.Allocator,
+        resources: ecs.Resources,
+        systems: ecs.Systems,
+    ) void {
+        resources.addOwned(allocator, Timers, .{});
+
+        systems.addGroupBefore(allocator, "one_shots", "timing");
+        systems.addSystem(allocator, "timing", beginFrame, self);
+        systems.addSystem(allocator, "pre_update", tick, self);
+    }
+
+    pub fn beginFrame(_: *TimerPlugin, timers: ecs.Resource(Timers)) void {
+        timers.value.beginFrame();
     }
 
     pub fn tick(

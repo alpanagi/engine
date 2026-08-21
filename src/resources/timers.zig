@@ -9,6 +9,7 @@ const panicOom = @import("../util.zig").panicOom;
 pub const Timers = struct {
     const Entry = struct {
         remaining: Duration,
+        created_frame: u64,
         event: *anyopaque,
 
         dispatch: *const fn (std.mem.Allocator, *anyopaque, Observers) void,
@@ -16,7 +17,12 @@ pub const Timers = struct {
         destroy: *const fn (std.mem.Allocator, *anyopaque) void,
     };
 
+    frame: u64 = 0,
     entries: std.ArrayList(Entry) = .empty,
+
+    pub fn beginFrame(self: *Timers) void {
+        self.frame += 1;
+    }
 
     pub fn deinit(self: *Timers, allocator: std.mem.Allocator) void {
         for (self.entries.items) |entry| {
@@ -39,6 +45,7 @@ pub const Timers = struct {
 
         self.entries.append(allocator, .{
             .remaining = duration,
+            .created_frame = self.frame,
             .event = owned,
             .dispatch = dispatchFunction(Event),
             .deinit = getDeinitFunction(Event),
@@ -59,6 +66,8 @@ pub const Timers = struct {
             index -= 1;
 
             const pending = &self.entries.items[index];
+            if (pending.created_frame == self.frame) continue;
+
             const remaining = pending.remaining.toNanoseconds();
             if (remaining > elapsed) {
                 pending.remaining = .fromNanoseconds(remaining - elapsed);

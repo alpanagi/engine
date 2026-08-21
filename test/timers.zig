@@ -17,7 +17,7 @@ const Owning = struct {
 test "dispatchOwnedEvent: holds the event until the duration elapses" {
     const allocator = std.testing.allocator;
 
-    var world = engine.World.init();
+    var world = engine.World.init(allocator);
     defer world.deinit(allocator);
 
     const State = struct {
@@ -25,7 +25,7 @@ test "dispatchOwnedEvent: holds the event until the duration elapses" {
     };
     State.fired = 0;
 
-    world.addObserver(allocator, engine.EventId.from(Plain), struct {
+    engine.Observers.fromWorld(allocator, &world).addObserver(allocator, engine.EventId.from(Plain), struct {
         fn call(event: engine.Event(Plain)) void {
             State.fired += event.value.value;
         }
@@ -34,13 +34,17 @@ test "dispatchOwnedEvent: holds the event until the duration elapses" {
     var timers = Timers{};
     defer timers.deinit(allocator);
 
+    world.runSystems(allocator);
+
     const observers = engine.Observers.fromWorld(allocator, &world);
     timers.dispatchOwnedEvent(allocator, .fromMilliseconds(1000), Plain{ .value = 7 });
 
+    timers.beginFrame();
     timers.tick(allocator, .fromMilliseconds(400), observers);
     try std.testing.expectEqual(0, State.fired);
     try std.testing.expectEqual(1, timers.entries.items.len);
 
+    timers.beginFrame();
     timers.tick(allocator, .fromMilliseconds(700), observers);
     try std.testing.expectEqual(7, State.fired);
     try std.testing.expectEqual(0, timers.entries.items.len);
@@ -49,7 +53,7 @@ test "dispatchOwnedEvent: holds the event until the duration elapses" {
 test "tick: fires every timer that expires in the same tick" {
     const allocator = std.testing.allocator;
 
-    var world = engine.World.init();
+    var world = engine.World.init(allocator);
     defer world.deinit(allocator);
 
     const State = struct {
@@ -57,7 +61,7 @@ test "tick: fires every timer that expires in the same tick" {
     };
     State.total = 0;
 
-    world.addObserver(allocator, engine.EventId.from(Plain), struct {
+    engine.Observers.fromWorld(allocator, &world).addObserver(allocator, engine.EventId.from(Plain), struct {
         fn call(event: engine.Event(Plain)) void {
             State.total += event.value.value;
         }
@@ -66,15 +70,19 @@ test "tick: fires every timer that expires in the same tick" {
     var timers = Timers{};
     defer timers.deinit(allocator);
 
+    world.runSystems(allocator);
+
     const observers = engine.Observers.fromWorld(allocator, &world);
     timers.dispatchOwnedEvent(allocator, .fromMilliseconds(100), Plain{ .value = 1 });
     timers.dispatchOwnedEvent(allocator, .fromMilliseconds(300), Plain{ .value = 2 });
     timers.dispatchOwnedEvent(allocator, .fromMilliseconds(100), Plain{ .value = 4 });
 
+    timers.beginFrame();
     timers.tick(allocator, .fromMilliseconds(150), observers);
     try std.testing.expectEqual(5, State.total);
     try std.testing.expectEqual(1, timers.entries.items.len);
 
+    timers.beginFrame();
     timers.tick(allocator, .fromMilliseconds(200), observers);
     try std.testing.expectEqual(7, State.total);
     try std.testing.expectEqual(0, timers.entries.items.len);
@@ -83,7 +91,7 @@ test "tick: fires every timer that expires in the same tick" {
 test "tick: an observer can schedule another timer while being dispatched" {
     const allocator = std.testing.allocator;
 
-    var world = engine.World.init();
+    var world = engine.World.init(allocator);
     defer world.deinit(allocator);
 
     var timers = Timers{};
@@ -100,7 +108,7 @@ test "tick: an observer can schedule another timer while being dispatched" {
     State.first = 0;
     State.second = 0;
 
-    world.addObserver(allocator, engine.EventId.from(Plain), struct {
+    engine.Observers.fromWorld(allocator, &world).addObserver(allocator, engine.EventId.from(Plain), struct {
         fn call(_: engine.Event(Plain)) void {
             State.first += 1;
             State.timers_ptr.dispatchOwnedEvent(
@@ -111,11 +119,13 @@ test "tick: an observer can schedule another timer while being dispatched" {
         }
     }.call, null);
 
-    world.addObserver(allocator, engine.EventId.from(Second), struct {
+    engine.Observers.fromWorld(allocator, &world).addObserver(allocator, engine.EventId.from(Second), struct {
         fn call(_: engine.Event(Second)) void {
             State.second += 1;
         }
     }.call, null);
+
+    world.runSystems(allocator);
 
     const observers = engine.Observers.fromWorld(allocator, &world);
 
@@ -124,11 +134,13 @@ test "tick: an observer can schedule another timer while being dispatched" {
         timers.dispatchOwnedEvent(allocator, .fromMilliseconds(10), Plain{ .value = 1 });
     }
 
+    timers.beginFrame();
     timers.tick(allocator, .fromMilliseconds(20), observers);
     try std.testing.expectEqual(24, State.first);
     try std.testing.expectEqual(0, State.second);
     try std.testing.expectEqual(24, timers.entries.items.len);
 
+    timers.beginFrame();
     timers.tick(allocator, .fromMilliseconds(200), observers);
     try std.testing.expectEqual(24, State.second);
     try std.testing.expectEqual(0, timers.entries.items.len);
@@ -137,7 +149,7 @@ test "tick: an observer can schedule another timer while being dispatched" {
 test "tick: releases an event that owns memory once it has fired" {
     const allocator = std.testing.allocator;
 
-    var world = engine.World.init();
+    var world = engine.World.init(allocator);
     defer world.deinit(allocator);
 
     var timers = Timers{};
@@ -148,6 +160,7 @@ test "tick: releases an event that owns memory once it has fired" {
         .fromMilliseconds(10),
         Owning{ .buffer = try allocator.alloc(u8, 8) },
     );
+    timers.beginFrame();
     timers.tick(allocator, .fromMilliseconds(20), engine.Observers.fromWorld(allocator, &world));
 
     try std.testing.expectEqual(0, timers.entries.items.len);
@@ -163,4 +176,45 @@ test "deinit: releases the events of timers that never fired" {
         Owning{ .buffer = try allocator.alloc(u8, 16) },
     );
     timers.deinit(allocator);
+}
+
+test "dispatchOwnedEvent: a timer never fires in the frame it was created" {
+    const allocator = std.testing.allocator;
+
+    var world = engine.World.init(allocator);
+    defer world.deinit(allocator);
+
+    const State = struct {
+        var fired: u32 = 0;
+    };
+    State.fired = 0;
+
+    engine.Observers.fromWorld(allocator, &world).addObserver(allocator, engine.EventId.from(Plain), struct {
+        fn call(event: engine.Event(Plain)) void {
+            State.fired += event.value.value;
+        }
+    }.call, null);
+
+    world.runSystems(allocator);
+
+    const observers = engine.Observers.fromWorld(allocator, &world);
+
+    var timers = Timers{};
+    defer timers.deinit(allocator);
+
+    timers.beginFrame();
+    timers.dispatchOwnedEvent(allocator, .fromMilliseconds(0), Plain{ .value = 1 });
+    timers.tick(allocator, .fromMilliseconds(16), observers);
+    try std.testing.expectEqual(0, State.fired);
+
+    timers.beginFrame();
+    timers.tick(allocator, .fromMilliseconds(16), observers);
+    try std.testing.expectEqual(1, State.fired);
+
+    timers.dispatchOwnedEvent(allocator, .fromMilliseconds(0), Plain{ .value = 2 });
+    try std.testing.expectEqual(1, State.fired);
+
+    timers.beginFrame();
+    timers.tick(allocator, .fromMilliseconds(16), observers);
+    try std.testing.expectEqual(3, State.fired);
 }

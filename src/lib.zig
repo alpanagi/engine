@@ -1,11 +1,14 @@
-pub const Commands = @import("ecs").Commands;
 pub const Engine = @import("engine.zig").Engine;
+pub const Entities = @import("ecs").Entities;
 pub const Entity = @import("ecs").Entity;
 pub const Event = @import("ecs").Event;
 pub const EventId = @import("ecs").EventId;
 pub const Observers = @import("ecs").Observers;
+pub const OneShots = @import("ecs").OneShots;
 pub const Query = @import("ecs").Query;
 pub const Resource = @import("ecs").Resource;
+pub const Resources = @import("ecs").Resources;
+pub const Systems = @import("ecs").Systems;
 pub const World = @import("ecs").World;
 
 pub const components = struct {

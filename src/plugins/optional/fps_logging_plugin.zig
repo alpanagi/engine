@@ -1,6 +1,6 @@
 const std = @import("std");
 
-const Commands = @import("ecs").Commands;
+const Systems = @import("ecs").Systems;
 const Resource = @import("ecs").Resource;
 const Time = @import("../../resources/time.zig").Time;
 const Timestamp = std.Io.Timestamp;
@@ -9,8 +9,8 @@ pub const FPSLoggingPlugin = struct {
     timestamp: Timestamp = .zero,
     rendered_frames: u32 = 0,
 
-    pub fn build(self: *FPSLoggingPlugin, allocator: std.mem.Allocator, commands: Commands) void {
-        commands.addSystem(allocator, "update", update, self);
+    pub fn build(self: *FPSLoggingPlugin, allocator: std.mem.Allocator, systems: Systems) void {
+        systems.addSystem(allocator, "update", update, self);
     }
 
     pub fn update(self: *FPSLoggingPlugin, time: Resource(Time)) void {

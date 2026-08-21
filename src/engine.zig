@@ -9,13 +9,9 @@ const TimePlugin = @import("plugins/time_plugin.zig").TimePlugin;
 const TimerPlugin = @import("plugins/timer_plugin.zig").TimerPlugin;
 const WindowPlugin = @import("plugins/window_plugin.zig").WindowPlugin;
 
-const AssetLoader = @import("resources/asset_loader/asset_loader.zig").AssetLoader;
 const Event = @import("ecs").Event;
 const EventId = @import("ecs").EventId;
-const Materials = @import("resources/materials.zig").Materials;
-const Meshes = @import("resources/meshes.zig").Meshes;
-const Time = @import("resources/time.zig").Time;
-const Timers = @import("resources/timers.zig").Timers;
+const Observers = @import("ecs").Observers;
 const World = @import("ecs").World;
 
 pub const ShuttingDown = struct {};
@@ -32,34 +28,24 @@ pub const Engine = struct {
         if (!sdl.SDL_SetHint(sdl.SDL_HINT_RENDER_DRIVER, "vulkan")) util.sdlPanic();
         if (!sdl.SDL_Init(sdl.SDL_INIT_VIDEO)) util.sdlPanic();
 
-        var world = World.init();
-        addResources(&world, allocator, io, options);
-        addPlugins(&world, allocator);
+        var world = World.init(allocator);
+        addPlugins(&world, allocator, io, options);
 
         return Engine{
             .world = world,
         };
     }
 
-    fn addResources(world: *World, allocator: std.mem.Allocator, io: std.Io, options: Options) void {
-        world.addOwnedResource(
-            allocator,
-            AssetLoader,
-            AssetLoader.init(allocator, io, .{
-                .working_directory = options.working_directory,
-            }),
-        );
-        world.addOwnedResource(allocator, Time, Time.init(io));
-        world.addOwnedResource(allocator, Timers, .{});
-        world.addOwnedResource(allocator, Materials, .{});
-        world.addOwnedResource(allocator, Meshes, .{});
-    }
-
-    fn addPlugins(world: *World, allocator: std.mem.Allocator) void {
-        world.addOwnedPlugin(allocator, TimePlugin{});
+    fn addPlugins(
+        world: *World,
+        allocator: std.mem.Allocator,
+        io: std.Io,
+        options: Options,
+    ) void {
+        world.addOwnedPlugin(allocator, TimePlugin{ .io = io });
         world.addOwnedPlugin(allocator, TimerPlugin{});
         world.addOwnedPlugin(allocator, ConfigPlugin{});
-        world.addOwnedPlugin(allocator, AssetPlugin{});
+        world.addOwnedPlugin(allocator, AssetPlugin.init(allocator, io, options.working_directory));
         world.addOwnedPlugin(allocator, GraphicsPlugin.init());
         world.addOwnedPlugin(allocator, WindowPlugin{});
     }
@@ -73,12 +59,9 @@ pub const Engine = struct {
         self.world.addOwnedPlugin(allocator, plugin);
     }
 
-    pub fn addOwnedResource(self: *Engine, allocator: std.mem.Allocator, comptime T: type, value: T) void {
-        self.world.addOwnedResource(allocator, T, value);
-    }
-
     pub fn run(self: *Engine, allocator: std.mem.Allocator) void {
-        self.world.addObserver(allocator, EventId.from(ShuttingDown), onShutdown, self);
+        const observers = Observers.fromWorld(allocator, &self.world);
+        observers.addObserver(allocator, EventId.from(ShuttingDown), onShutdown, self);
 
         while (!self.has_received_termination_request) {
             self.world.runSystems(allocator);

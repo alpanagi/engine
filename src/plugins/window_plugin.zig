@@ -65,22 +65,27 @@ pub const WindowPlugin = struct {
         if (self.icon) |icon| sdl.SDL_DestroySurface(icon);
     }
 
-    pub fn build(self: *WindowPlugin, allocator: std.mem.Allocator, commands: ecs.Commands) void {
-        commands.addObserver(allocator, ecs.events.resource.added(Config), onConfigAdded, self);
-        commands.addSystem(allocator, "update", readSDLWindowEvents, self);
+    pub fn build(
+        self: *WindowPlugin,
+        allocator: std.mem.Allocator,
+        observers: ecs.Observers,
+        systems: ecs.Systems,
+    ) void {
+        observers.addObserver(allocator, ecs.events.resource.added(Config), onConfigAdded, self);
+        systems.addSystem(allocator, "update", readSDLWindowEvents, self);
     }
 
     pub fn onConfigAdded(
         _: *WindowPlugin,
         allocator: std.mem.Allocator,
-        commands: ecs.Commands,
+        entities: ecs.Entities,
         config: ecs.Resource(Config),
         asset_loader: ecs.Resource(AssetLoader),
         _: ecs.Event(ecs.events.ResourceAdded),
     ) void {
         const icon = asset_loader.value.loadImage(allocator, config.value.window.icon) catch null;
         const window = Window.init(allocator, config.value.window.title, icon, 1280, 720);
-        commands.spawnOwned(allocator, .{window});
+        entities.spawnOwned(allocator, .{window});
     }
 
     pub fn readSDLWindowEvents(
