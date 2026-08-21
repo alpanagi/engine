@@ -10,9 +10,9 @@ const TimerPlugin = @import("plugins/timer_plugin.zig").TimerPlugin;
 const WindowPlugin = @import("plugins/window_plugin.zig").WindowPlugin;
 
 const Event = @import("ecs").Event;
-const EventId = @import("ecs").EventId;
 const Observers = @import("ecs").Observers;
 const World = @import("ecs").World;
+const eventId = @import("ecs").eventId;
 
 pub const ShuttingDown = struct {};
 
@@ -61,7 +61,7 @@ pub const Engine = struct {
 
     pub fn run(self: *Engine, allocator: std.mem.Allocator) void {
         const observers = Observers.fromWorld(allocator, &self.world);
-        observers.add(allocator, EventId.from(ShuttingDown), onShutdown, self);
+        observers.add(allocator, eventId(ShuttingDown), onShutdown, self);
 
         while (!self.has_received_termination_request) {
             self.world.runSystems(allocator);

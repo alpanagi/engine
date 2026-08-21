@@ -9,8 +9,8 @@
             .hash = "toml-0.0.0-yNlRTNaqAQBDJQJQuIZUBI5snk6Cfz1iia4gnLKJFZOl",
         },
         .ecs = .{
-            .url = "git+https://github.com/alpanagi/ecs.git#ce80c9aae458f282dff4e2ce1c786f21c2112322",
-            .hash = "ecs-0.0.0-3WUiBysYBAAGOH2QhakBaiAB934lEddeY-AmePRmUCVQ",
+            .url = "git+https://github.com/alpanagi/ecs.git#4b38b666b22f3fb8ecc6deef1eb1d68734bb11bb",
+            .hash = "ecs-0.0.0-3WUiBysqBAAQLjKMor_yuQxsOK8NeFErG7z8u-t9ZHNL",
         },
         .shaders = .{
             .url = "https://github.com/alpanagi/shaders/releases/download/v0.0.0/shaders-v0.0.0.tar.gz",

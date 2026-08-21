@@ -11,6 +11,8 @@ pub const Resources = @import("ecs").Resources;
 pub const Systems = @import("ecs").Systems;
 pub const World = @import("ecs").World;
 
+pub const eventId = @import("ecs").eventId;
+
 pub const components = struct {
     pub const Active = @import("components/active.zig").Active;
     pub const Camera = @import("components/camera.zig").Camera;
@@ -23,14 +25,17 @@ pub const data = struct {
 };
 
 pub const events = struct {
-    pub const component = @import("ecs").events.component;
-    pub const resource = @import("ecs").events.resource;
     pub const ComponentAdded = @import("ecs").events.ComponentAdded;
     pub const ComponentDestroying = @import("ecs").events.ComponentDestroying;
     pub const ResourceAdded = @import("ecs").events.ResourceAdded;
     pub const ResourceDestroying = @import("ecs").events.ResourceDestroying;
     pub const ShuttingDown = @import("engine.zig").ShuttingDown;
     pub const WindowDestroying = @import("plugins/window_plugin.zig").WindowDestroying;
+
+    pub const componentAdded = @import("ecs").events.componentAdded;
+    pub const componentDestroying = @import("ecs").events.componentDestroying;
+    pub const resourceAdded = @import("ecs").events.resourceAdded;
+    pub const resourceDestroying = @import("ecs").events.resourceDestroying;
 };
 
 pub const gltf = struct {

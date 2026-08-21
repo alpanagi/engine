@@ -97,12 +97,12 @@ pub const GraphicsPlugin = struct {
 
         one_shots.add(allocator, setup, self);
 
-        observers.add(allocator, ecs.events.resource.added(Config), onConfigAdded, self);
-        observers.add(allocator, ecs.events.component.added(Window), onWindowCreate, self);
-        observers.add(allocator, ecs.EventId.from(WindowDestroying), onWindowDestroy, self);
-        observers.add(allocator, ecs.EventId.from(WindowPixelSizeChanged), onWindowPixelSizeChanged, self);
-        observers.add(allocator, ecs.events.component.added(MeshInstance), onMeshInstanceAdded, self);
-        observers.add(allocator, ecs.events.component.destroying(MeshInstance), onMeshInstanceDestroying, self);
+        observers.add(allocator, ecs.events.resourceAdded(Config), onConfigAdded, self);
+        observers.add(allocator, ecs.events.componentAdded(Window), onWindowCreate, self);
+        observers.add(allocator, ecs.eventId(WindowDestroying), onWindowDestroy, self);
+        observers.add(allocator, ecs.eventId(WindowPixelSizeChanged), onWindowPixelSizeChanged, self);
+        observers.add(allocator, ecs.events.componentAdded(MeshInstance), onMeshInstanceAdded, self);
+        observers.add(allocator, ecs.events.componentDestroying(MeshInstance), onMeshInstanceDestroying, self);
 
         systems.add(allocator, "post_update", registerPendingMaterials, self);
         systems.add(allocator, "post_update", registerPendingMeshes, self);

@@ -71,7 +71,7 @@ pub const WindowPlugin = struct {
         observers: ecs.Observers,
         systems: ecs.Systems,
     ) void {
-        observers.add(allocator, ecs.events.resource.added(Config), onConfigAdded, self);
+        observers.add(allocator, ecs.events.resourceAdded(Config), onConfigAdded, self);
         systems.add(allocator, "update", readSDLWindowEvents, self);
     }
 
