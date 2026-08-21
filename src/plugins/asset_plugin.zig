@@ -1,7 +1,7 @@
 const ecs = @import("ecs");
 const std = @import("std");
 
-const AssetLoader = @import("../resources/asset_loader/asset_loader.zig").AssetLoader;
+const AssetLoader = @import("../params/asset_loader/asset_loader.zig").AssetLoader;
 const panicOom = @import("../util.zig").panicOom;
 
 pub const AssetPlugin = struct {
@@ -30,7 +30,7 @@ pub const AssetPlugin = struct {
         resources: ecs.Resources,
         systems: ecs.Systems,
     ) void {
-        resources.addOwned(allocator, AssetLoader, AssetLoader.init(allocator, self.io, .{
+        resources.addOwned(allocator, AssetLoader.State, AssetLoader.State.init(allocator, self.io, .{
             .working_directory = self.working_directory,
         }));
         systems.add(allocator, "pre_update", consumeCompletedFiles, self);
@@ -39,7 +39,7 @@ pub const AssetPlugin = struct {
     pub fn consumeCompletedFiles(
         _: *AssetPlugin,
         allocator: std.mem.Allocator,
-        asset_loader: ecs.Resource(AssetLoader),
+        asset_loader: ecs.Resource(AssetLoader.State),
     ) void {
         const files = asset_loader.value.takeCompletedFiles(allocator);
         defer allocator.free(files);

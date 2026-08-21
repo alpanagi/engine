@@ -1,8 +1,7 @@
 const std = @import("std");
 
 const Systems = @import("ecs").Systems;
-const Resource = @import("ecs").Resource;
-const Time = @import("../../resources/time.zig").Time;
+const Time = @import("../../params/time.zig").Time;
 const Timestamp = std.Io.Timestamp;
 
 pub const FPSLoggingPlugin = struct {
@@ -13,15 +12,15 @@ pub const FPSLoggingPlugin = struct {
         systems.add(allocator, "update", update, self);
     }
 
-    pub fn update(self: *FPSLoggingPlugin, time: Resource(Time)) void {
+    pub fn update(self: *FPSLoggingPlugin, time: Time) void {
         if (self.timestamp.nanoseconds == 0) {
-            self.timestamp = time.value.now();
+            self.timestamp = time.now();
             return;
         }
 
         self.rendered_frames += 1;
 
-        const now = time.value.now();
+        const now = time.now();
         if (self.timestamp.durationTo(now).toSeconds() >= 1) {
             std.log.info("FPS: {d}", .{self.rendered_frames});
             self.timestamp = now;

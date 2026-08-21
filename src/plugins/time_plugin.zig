@@ -1,7 +1,7 @@
 const ecs = @import("ecs");
 const std = @import("std");
 
-const Time = @import("../resources/time.zig").Time;
+const Time = @import("../params/time.zig").Time;
 
 pub const TimePlugin = struct {
     io: std.Io,
@@ -12,11 +12,11 @@ pub const TimePlugin = struct {
         resources: ecs.Resources,
         systems: ecs.Systems,
     ) void {
-        resources.addOwned(allocator, Time, Time.init(self.io));
+        resources.addOwned(allocator, Time.State, Time.State.init(self.io));
         systems.add(allocator, "pre_update", tick, self);
     }
 
-    pub fn tick(_: *TimePlugin, time: ecs.Resource(Time)) void {
+    pub fn tick(_: *TimePlugin, time: ecs.Resource(Time.State)) void {
         time.value.tick();
     }
 };

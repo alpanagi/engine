@@ -3,37 +3,26 @@ const std = @import("std");
 const DeinitFunction = @import("ecs").DeinitFunction;
 const Duration = std.Io.Duration;
 const Observers = @import("ecs").Observers;
+const World = @import("ecs").World;
+
 const getDeinitFunction = @import("ecs").getDeinitFunction;
+const panic = @import("../util.zig").panic;
 const panicOom = @import("../util.zig").panicOom;
 
 pub const Timers = struct {
-    const Entry = struct {
-        remaining: Duration,
-        created_frame: u64,
-        event: *anyopaque,
+    pub const State = TimersState;
 
-        dispatch: *const fn (std.mem.Allocator, *anyopaque, Observers) void,
-        deinit: DeinitFunction,
-        destroy: *const fn (std.mem.Allocator, *anyopaque) void,
-    };
+    state: *State,
 
-    frame: u64 = 0,
-    entries: std.ArrayList(Entry) = .empty,
-
-    pub fn beginFrame(self: *Timers) void {
-        self.frame += 1;
-    }
-
-    pub fn deinit(self: *Timers, allocator: std.mem.Allocator) void {
-        for (self.entries.items) |entry| {
-            entry.deinit(allocator, entry.event);
-            entry.destroy(allocator, entry.event);
-        }
-        self.entries.deinit(allocator);
+    pub fn fromWorld(_: std.mem.Allocator, world: *World) Timers {
+        return .{
+            .state = world.resources.get(State) orelse
+                panic("system requires Timers but the timer plugin is not registered", .{}),
+        };
     }
 
     pub fn dispatchOwnedEvent(
-        self: *Timers,
+        self: Timers,
         allocator: std.mem.Allocator,
         duration: Duration,
         event: anytype,
@@ -43,18 +32,35 @@ pub const Timers = struct {
         const owned = allocator.create(Event) catch panicOom("Timers.dispatchOwnedEvent");
         owned.* = event;
 
-        self.entries.append(allocator, .{
+        self.state.entries.append(allocator, .{
             .remaining = duration,
-            .created_frame = self.frame,
+            .created_frame = self.state.frame,
             .event = owned,
             .dispatch = dispatchFunction(Event),
             .deinit = getDeinitFunction(Event),
             .destroy = destroyFunction(Event),
         }) catch panicOom("Timers.dispatchOwnedEvent");
     }
+};
+
+const TimersState = struct {
+    frame: u64 = 0,
+    entries: std.ArrayList(Entry) = .empty,
+
+    pub fn beginFrame(self: *TimersState) void {
+        self.frame += 1;
+    }
+
+    pub fn deinit(self: *TimersState, allocator: std.mem.Allocator) void {
+        for (self.entries.items) |entry| {
+            entry.deinit(allocator, entry.event);
+            entry.destroy(allocator, entry.event);
+        }
+        self.entries.deinit(allocator);
+    }
 
     pub fn tick(
-        self: *Timers,
+        self: *TimersState,
         allocator: std.mem.Allocator,
         delta: Duration,
         observers: Observers,
@@ -81,6 +87,16 @@ pub const Timers = struct {
     }
 };
 
+const Entry = struct {
+    remaining: Duration,
+    created_frame: u64,
+    event: *anyopaque,
+
+    dispatch: *const fn (std.mem.Allocator, *anyopaque, Observers) void,
+    deinit: DeinitFunction,
+    destroy: *const fn (std.mem.Allocator, *anyopaque) void,
+};
+
 fn dispatchFunction(comptime Event: type) *const fn (std.mem.Allocator, *anyopaque, Observers) void {
     return struct {
         fn call(allocator: std.mem.Allocator, event: *anyopaque, observers: Observers) void {
@@ -98,4 +114,3 @@ fn destroyFunction(comptime Event: type) *const fn (std.mem.Allocator, *anyopaqu
         }
     }.call;
 }
-

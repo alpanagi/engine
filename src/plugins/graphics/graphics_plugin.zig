@@ -13,8 +13,8 @@ const Config = @import("../../resources/config.zig").Config;
 const GPUMesh = @import("gpu_mesh.zig").GPUMesh;
 const Instance = @import("instance.zig").Instance;
 const Material = @import("material.zig").Material;
-const Materials = @import("../../resources/materials.zig").Materials;
-const Meshes = @import("../../resources/meshes.zig").Meshes;
+const Materials = @import("../../params/materials.zig").Materials;
+const Meshes = @import("../../params/meshes.zig").Meshes;
 const MeshInstance = @import("../../components/mesh_instance.zig").MeshInstance;
 const Transform = @import("../../components/transform.zig").Transform;
 const Window = @import("../window_plugin.zig").Window;
@@ -92,8 +92,8 @@ pub const GraphicsPlugin = struct {
         observers: ecs.Observers,
         systems: ecs.Systems,
     ) void {
-        resources.addOwned(allocator, Materials, .{});
-        resources.addOwned(allocator, Meshes, .{});
+        resources.addOwned(allocator, Materials.State, .{});
+        resources.addOwned(allocator, Meshes.State, .{});
 
         one_shots.add(allocator, setup, self);
 
@@ -112,10 +112,10 @@ pub const GraphicsPlugin = struct {
         systems.add(allocator, "post_update", present, self);
     }
 
-    pub fn setup(_: *GraphicsPlugin, allocator: std.mem.Allocator, materials: ecs.Resource(Materials)) void {
+    pub fn setup(_: *GraphicsPlugin, allocator: std.mem.Allocator, materials: Materials) void {
         const diffuse = allocator.dupe(u8, shaders.diffuse) catch
             util.panicOom("GraphicsPlugin.setup");
-        materials.value.addOwned(allocator, "engine.diffuse", diffuse);
+        materials.addOwned(allocator, "engine.diffuse", diffuse);
     }
 
     pub fn onConfigAdded(
@@ -183,7 +183,7 @@ pub const GraphicsPlugin = struct {
     pub fn onMeshInstanceAdded(
         self: *GraphicsPlugin,
         allocator: std.mem.Allocator,
-        meshes: ecs.Resource(Meshes),
+        meshes: ecs.Resource(Meshes.State),
         mesh_instances: ecs.Query(&.{MeshInstance}),
         component_added_event: ecs.Event(ecs.events.ComponentAdded),
     ) void {
@@ -240,7 +240,7 @@ pub const GraphicsPlugin = struct {
     pub fn registerPendingMaterials(
         self: *GraphicsPlugin,
         allocator: std.mem.Allocator,
-        materials: ecs.Resource(Materials),
+        materials: ecs.Resource(Materials.State),
     ) void {
         if (materials.value.pending.items.len == 0) return;
         defer materials.value.pending.clearRetainingCapacity();
@@ -267,7 +267,7 @@ pub const GraphicsPlugin = struct {
     pub fn registerPendingMeshes(
         self: *GraphicsPlugin,
         allocator: std.mem.Allocator,
-        meshes: ecs.Resource(Meshes),
+        meshes: ecs.Resource(Meshes.State),
     ) void {
         if (meshes.value.pending.items.len == 0) return;
         defer meshes.value.pending.clearRetainingCapacity();

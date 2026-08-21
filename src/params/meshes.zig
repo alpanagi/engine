@@ -2,6 +2,7 @@ const std = @import("std");
 const util = @import("../util.zig");
 
 const MeshData = @import("../data/mesh_data.zig").MeshData;
+const World = @import("ecs").World;
 
 pub const PendingMesh = struct {
     id: []const u8,
@@ -29,24 +30,36 @@ pub const PendingMesh = struct {
 };
 
 pub const Meshes = struct {
-    pending: std.ArrayList(PendingMesh) = .empty,
+    pub const State = MeshesState;
 
-    pub fn deinit(self: *Meshes, allocator: std.mem.Allocator) void {
-        for (self.pending.items) |*mesh| mesh.deinit(allocator);
-        self.pending.deinit(allocator);
+    state: *State,
+
+    pub fn fromWorld(_: std.mem.Allocator, world: *World) Meshes {
+        return .{
+            .state = world.resources.get(State) orelse
+                util.panic("system requires Meshes but the graphics plugin is not registered", .{}),
+        };
     }
 
     pub fn addOwned(
-        self: *Meshes,
+        self: Meshes,
         allocator: std.mem.Allocator,
         id: []const u8,
         material: []const u8,
         data: MeshData,
     ) void {
-        self.pending.append(
+        self.state.pending.append(
             allocator,
             PendingMesh.init(allocator, id, material, data),
-        ) catch
-            util.panicOom("Meshes.addOwned");
+        ) catch util.panicOom("Meshes.addOwned");
+    }
+};
+
+const MeshesState = struct {
+    pending: std.ArrayList(PendingMesh) = .empty,
+
+    pub fn deinit(self: *MeshesState, allocator: std.mem.Allocator) void {
+        for (self.pending.items) |*mesh| mesh.deinit(allocator);
+        self.pending.deinit(allocator);
     }
 };

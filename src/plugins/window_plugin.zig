@@ -3,7 +3,7 @@ const sdl = @import("sdl");
 const std = @import("std");
 const util = @import("../util.zig");
 
-const AssetLoader = @import("../resources/asset_loader/asset_loader.zig").AssetLoader;
+const AssetLoader = @import("../params/asset_loader/asset_loader.zig").AssetLoader;
 const Config = @import("../resources/config.zig").Config;
 const ShuttingDown = @import("../engine.zig").ShuttingDown;
 
@@ -80,10 +80,10 @@ pub const WindowPlugin = struct {
         allocator: std.mem.Allocator,
         entities: ecs.Entities,
         config: ecs.Resource(Config),
-        asset_loader: ecs.Resource(AssetLoader),
+        asset_loader: AssetLoader,
         _: ecs.Event(ecs.events.ResourceAdded),
     ) void {
-        const icon = asset_loader.value.loadImage(allocator, config.value.window.icon) catch null;
+        const icon = asset_loader.loadImage(allocator, config.value.window.icon) catch null;
         const window = Window.init(allocator, config.value.window.title, icon, 1280, 720);
         entities.spawnOwned(allocator, .{window});
     }

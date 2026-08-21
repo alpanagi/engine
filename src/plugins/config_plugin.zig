@@ -1,7 +1,7 @@
 const ecs = @import("ecs");
 const std = @import("std");
 
-const AssetLoader = @import("../resources/asset_loader/asset_loader.zig").AssetLoader;
+const AssetLoader = @import("../params/asset_loader/asset_loader.zig").AssetLoader;
 const Config = @import("../resources/config.zig").Config;
 
 pub const ConfigPlugin = struct {
@@ -13,9 +13,9 @@ pub const ConfigPlugin = struct {
         _: *ConfigPlugin,
         allocator: std.mem.Allocator,
         resources: ecs.Resources,
-        asset_loader: ecs.Resource(AssetLoader),
+        asset_loader: AssetLoader,
     ) void {
-        const config = asset_loader.value.loadToml(allocator, Config, "project.toml") catch
+        const config = asset_loader.loadToml(allocator, Config, "project.toml") catch
             Config.default(allocator);
         resources.addOwned(allocator, Config, config);
     }
