@@ -1,7 +1,7 @@
 const engine = @import("engine");
 const std = @import("std");
 
-const Timers = engine.Timers;
+const Timers = engine.params.Timers;
 
 const Plain = struct { value: u32 };
 const Second = struct {};
@@ -25,8 +25,8 @@ test "dispatchOwnedEvent: holds the event until the duration elapses" {
     };
     State.fired = 0;
 
-    engine.Observers.fromWorld(allocator, &world).add(allocator, engine.eventId(Plain), struct {
-        fn call(event: engine.Event(Plain)) void {
+    engine.params.Observers.fromWorld(allocator, &world).add(allocator, engine.eventId(Plain), struct {
+        fn call(event: engine.params.Event(Plain)) void {
             State.fired += event.value.value;
         }
     }.call, null);
@@ -37,7 +37,7 @@ test "dispatchOwnedEvent: holds the event until the duration elapses" {
 
     world.runSystems(allocator);
 
-    const observers = engine.Observers.fromWorld(allocator, &world);
+    const observers = engine.params.Observers.fromWorld(allocator, &world);
     timers.dispatchOwnedEvent(allocator, .fromMilliseconds(1000), Plain{ .value = 7 });
 
     timers_state.beginFrame();
@@ -62,8 +62,8 @@ test "tick: fires every timer that expires in the same tick" {
     };
     State.total = 0;
 
-    engine.Observers.fromWorld(allocator, &world).add(allocator, engine.eventId(Plain), struct {
-        fn call(event: engine.Event(Plain)) void {
+    engine.params.Observers.fromWorld(allocator, &world).add(allocator, engine.eventId(Plain), struct {
+        fn call(event: engine.params.Event(Plain)) void {
             State.total += event.value.value;
         }
     }.call, null);
@@ -74,7 +74,7 @@ test "tick: fires every timer that expires in the same tick" {
 
     world.runSystems(allocator);
 
-    const observers = engine.Observers.fromWorld(allocator, &world);
+    const observers = engine.params.Observers.fromWorld(allocator, &world);
     timers.dispatchOwnedEvent(allocator, .fromMilliseconds(100), Plain{ .value = 1 });
     timers.dispatchOwnedEvent(allocator, .fromMilliseconds(300), Plain{ .value = 2 });
     timers.dispatchOwnedEvent(allocator, .fromMilliseconds(100), Plain{ .value = 4 });
@@ -111,8 +111,8 @@ test "tick: an observer can schedule another timer while being dispatched" {
     State.first = 0;
     State.second = 0;
 
-    engine.Observers.fromWorld(allocator, &world).add(allocator, engine.eventId(Plain), struct {
-        fn call(_: engine.Event(Plain)) void {
+    engine.params.Observers.fromWorld(allocator, &world).add(allocator, engine.eventId(Plain), struct {
+        fn call(_: engine.params.Event(Plain)) void {
             State.first += 1;
             State.timers_handle.dispatchOwnedEvent(
                 State.timers_allocator,
@@ -122,15 +122,15 @@ test "tick: an observer can schedule another timer while being dispatched" {
         }
     }.call, null);
 
-    engine.Observers.fromWorld(allocator, &world).add(allocator, engine.eventId(Second), struct {
-        fn call(_: engine.Event(Second)) void {
+    engine.params.Observers.fromWorld(allocator, &world).add(allocator, engine.eventId(Second), struct {
+        fn call(_: engine.params.Event(Second)) void {
             State.second += 1;
         }
     }.call, null);
 
     world.runSystems(allocator);
 
-    const observers = engine.Observers.fromWorld(allocator, &world);
+    const observers = engine.params.Observers.fromWorld(allocator, &world);
 
     var index: u32 = 0;
     while (index < 24) : (index += 1) {
@@ -165,7 +165,7 @@ test "tick: releases an event that owns memory once it has fired" {
         Owning{ .buffer = try allocator.alloc(u8, 8) },
     );
     timers_state.beginFrame();
-    timers_state.tick(allocator, .fromMilliseconds(20), engine.Observers.fromWorld(allocator, &world));
+    timers_state.tick(allocator, .fromMilliseconds(20), engine.params.Observers.fromWorld(allocator, &world));
 
     try std.testing.expectEqual(0, timers_state.entries.items.len);
 }
@@ -194,15 +194,15 @@ test "dispatchOwnedEvent: a timer never fires in the frame it was created" {
     };
     State.fired = 0;
 
-    engine.Observers.fromWorld(allocator, &world).add(allocator, engine.eventId(Plain), struct {
-        fn call(event: engine.Event(Plain)) void {
+    engine.params.Observers.fromWorld(allocator, &world).add(allocator, engine.eventId(Plain), struct {
+        fn call(event: engine.params.Event(Plain)) void {
             State.fired += event.value.value;
         }
     }.call, null);
 
     world.runSystems(allocator);
 
-    const observers = engine.Observers.fromWorld(allocator, &world);
+    const observers = engine.params.Observers.fromWorld(allocator, &world);
 
     var timers_state = Timers.State{};
     defer timers_state.deinit(allocator);

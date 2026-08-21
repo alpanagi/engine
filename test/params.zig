@@ -22,23 +22,23 @@ test "the engine params resolve from the world and write through to their state"
     var world = engine.World.init(allocator);
     defer world.deinit(allocator);
 
-    const resources = engine.Resources.fromWorld(allocator, &world);
-    resources.addOwned(allocator, engine.Timers.State, .{});
-    resources.addOwned(allocator, engine.Meshes.State, .{});
-    resources.addOwned(allocator, engine.Materials.State, .{});
+    const resources = engine.params.Resources.fromWorld(allocator, &world);
+    resources.addOwned(allocator, engine.params.Timers.State, .{});
+    resources.addOwned(allocator, engine.params.Meshes.State, .{});
+    resources.addOwned(allocator, engine.params.Materials.State, .{});
 
-    engine.Observers.fromWorld(allocator, &world).add(allocator, engine.eventId(Fired), struct {
-        fn call(event: engine.Event(Fired)) void {
+    engine.params.Observers.fromWorld(allocator, &world).add(allocator, engine.eventId(Fired), struct {
+        fn call(event: engine.params.Event(Fired)) void {
             Seen.fired += event.value.value;
         }
     }.call, null);
 
-    engine.Systems.fromWorld(allocator, &world).add(allocator, "update", struct {
+    engine.params.Systems.fromWorld(allocator, &world).add(allocator, "update", struct {
         fn call(
             inner: std.mem.Allocator,
-            timers: engine.Timers,
-            meshes: engine.Meshes,
-            materials: engine.Materials,
+            timers: engine.params.Timers,
+            meshes: engine.params.Meshes,
+            materials: engine.params.Materials,
         ) void {
             timers.dispatchOwnedEvent(inner, .fromMilliseconds(10), Fired{ .value = 7 });
             meshes.addOwned(inner, "cube", "engine.diffuse", .{ .positions = Prepared.positions });
@@ -48,13 +48,13 @@ test "the engine params resolve from the world and write through to their state"
 
     world.runSystems(allocator);
 
-    const timers_state = world.resources.get(engine.Timers.State).?;
+    const timers_state = world.resources.get(engine.params.Timers.State).?;
     try std.testing.expectEqual(1, timers_state.entries.items.len);
-    try std.testing.expectEqual(1, world.resources.get(engine.Meshes.State).?.pending.items.len);
-    try std.testing.expectEqual(1, world.resources.get(engine.Materials.State).?.pending.items.len);
+    try std.testing.expectEqual(1, world.resources.get(engine.params.Meshes.State).?.pending.items.len);
+    try std.testing.expectEqual(1, world.resources.get(engine.params.Materials.State).?.pending.items.len);
 
     timers_state.beginFrame();
-    timers_state.tick(allocator, .fromMilliseconds(50), engine.Observers.fromWorld(allocator, &world));
+    timers_state.tick(allocator, .fromMilliseconds(50), engine.params.Observers.fromWorld(allocator, &world));
 
     try std.testing.expectEqual(7, Seen.fired);
     try std.testing.expectEqual(0, timers_state.entries.items.len);

@@ -7,6 +7,7 @@ test "the engine module and the plugins it registers compile" {
     std.testing.refAllDecls(engine.data);
     std.testing.refAllDecls(engine.events);
     std.testing.refAllDecls(engine.math);
+    std.testing.refAllDecls(engine.params);
     std.testing.refAllDecls(engine.resources);
     std.testing.refAllDecls(engine.Engine);
 }
@@ -18,17 +19,17 @@ const Seen = struct {
 };
 
 const ConsumerPlugin = struct {
-    pub fn build(self: *ConsumerPlugin, allocator: std.mem.Allocator, one_shots: engine.OneShots) void {
+    pub fn build(self: *ConsumerPlugin, allocator: std.mem.Allocator, one_shots: engine.params.OneShots) void {
         one_shots.add(allocator, setup, self);
     }
 
-    pub fn setup(_: *ConsumerPlugin, provided: engine.Resource(Provided)) void {
+    pub fn setup(_: *ConsumerPlugin, provided: engine.params.Resource(Provided)) void {
         Seen.value = provided.value.value;
     }
 };
 
 const ProviderPlugin = struct {
-    pub fn build(_: *ProviderPlugin, allocator: std.mem.Allocator, resources: engine.Resources) void {
+    pub fn build(_: *ProviderPlugin, allocator: std.mem.Allocator, resources: engine.params.Resources) void {
         resources.addOwned(allocator, Provided, .{ .value = 9 });
     }
 };

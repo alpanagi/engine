@@ -1,19 +1,6 @@
-pub const AssetLoader = @import("params/asset_loader/asset_loader.zig").AssetLoader;
 pub const Engine = @import("engine.zig").Engine;
-pub const Entities = @import("ecs").Entities;
 pub const Entity = @import("ecs").Entity;
-pub const Event = @import("ecs").Event;
 pub const EventId = @import("ecs").EventId;
-pub const Materials = @import("params/materials.zig").Materials;
-pub const Meshes = @import("params/meshes.zig").Meshes;
-pub const Observers = @import("ecs").Observers;
-pub const OneShots = @import("ecs").OneShots;
-pub const Query = @import("ecs").Query;
-pub const Resource = @import("ecs").Resource;
-pub const Resources = @import("ecs").Resources;
-pub const Systems = @import("ecs").Systems;
-pub const Time = @import("params/time.zig").Time;
-pub const Timers = @import("params/timers.zig").Timers;
 pub const World = @import("ecs").World;
 
 pub const eventId = @import("ecs").eventId;
@@ -58,6 +45,22 @@ pub const math = struct {
     pub const Mat4 = mat4.Mat4;
     pub const Quat = quat.Quat;
     pub const Vec4 = vec4.Vec4;
+};
+
+pub const params = struct {
+    pub const AssetLoader = @import("params/asset_loader/asset_loader.zig").AssetLoader;
+    pub const Entities = @import("ecs").Entities;
+    pub const Event = @import("ecs").Event;
+    pub const Materials = @import("params/materials.zig").Materials;
+    pub const Meshes = @import("params/meshes.zig").Meshes;
+    pub const Observers = @import("ecs").Observers;
+    pub const OneShots = @import("ecs").OneShots;
+    pub const Query = @import("ecs").Query;
+    pub const Resource = @import("ecs").Resource;
+    pub const Resources = @import("ecs").Resources;
+    pub const Systems = @import("ecs").Systems;
+    pub const Time = @import("params/time.zig").Time;
+    pub const Timers = @import("params/timers.zig").Timers;
 };
 
 pub const plugins = struct {
