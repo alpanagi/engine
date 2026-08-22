@@ -8,7 +8,7 @@ const Seen = struct {
 };
 
 const Prepared = struct {
-    var positions: [][3]f32 = &.{};
+    var vertices: []engine.data.Vertex = &.{};
     var shader: []u8 = &.{};
 };
 
@@ -16,7 +16,7 @@ test "the engine params resolve from the world and write through to their state"
     const allocator = std.testing.allocator;
 
     Seen.fired = 0;
-    Prepared.positions = try allocator.alloc([3]f32, 1);
+    Prepared.vertices = try allocator.alloc(engine.data.Vertex, 1);
     Prepared.shader = try allocator.dupe(u8, "shader");
 
     var world = engine.World.init(allocator);
@@ -41,7 +41,7 @@ test "the engine params resolve from the world and write through to their state"
             materials: engine.params.Materials,
         ) void {
             timers.dispatchOwnedEvent(inner, .fromMilliseconds(10), Fired{ .value = 7 });
-            meshes.addOwned(inner, "cube", "engine.diffuse", .{ .positions = Prepared.positions });
+            meshes.addOwned(inner, "cube", "engine.diffuse", Prepared.vertices);
             materials.addOwned(inner, "engine.diffuse", Prepared.shader);
         }
     }.call, null);

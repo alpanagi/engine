@@ -1,31 +1,31 @@
 const std = @import("std");
 const util = @import("../util.zig");
 
-const MeshData = @import("../data/mesh_data.zig").MeshData;
+const Vertex = @import("../data/vertex.zig").Vertex;
 const World = @import("ecs").World;
 
 pub const PendingMesh = struct {
     id: []const u8,
     material: []const u8,
-    data: MeshData,
+    vertices: []Vertex,
 
     fn init(
         allocator: std.mem.Allocator,
         id: []const u8,
         material: []const u8,
-        data: MeshData,
+        vertices: []Vertex,
     ) PendingMesh {
         return .{
             .id = allocator.dupe(u8, id) catch util.panicOom("PendingMesh.init"),
             .material = allocator.dupe(u8, material) catch util.panicOom("PendingMesh.init"),
-            .data = data,
+            .vertices = vertices,
         };
     }
 
     pub fn deinit(self: *PendingMesh, allocator: std.mem.Allocator) void {
         allocator.free(self.id);
         allocator.free(self.material);
-        self.data.deinit(allocator);
+        allocator.free(self.vertices);
     }
 };
 
@@ -46,11 +46,11 @@ pub const Meshes = struct {
         allocator: std.mem.Allocator,
         id: []const u8,
         material: []const u8,
-        data: MeshData,
+        vertices: []Vertex,
     ) void {
         self.state.pending.append(
             allocator,
-            PendingMesh.init(allocator, id, material, data),
+            PendingMesh.init(allocator, id, material, vertices),
         ) catch util.panicOom("Meshes.addOwned");
     }
 };

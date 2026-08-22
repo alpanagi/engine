@@ -295,8 +295,8 @@ pub const GraphicsPlugin = struct {
 
             const material = &self.materials.items[material_index];
 
-            const vertex_offset = material.addVertices(self.device, pending_mesh.data.positions);
-            const gpu_mesh = GPUMesh.init(self.device, vertex_offset, pending_mesh.data.vertexCount());
+            const vertex_offset = material.addVertices(self.device, pending_mesh.vertices);
+            const gpu_mesh = GPUMesh.init(self.device, vertex_offset, @intCast(pending_mesh.vertices.len));
 
             const gpu_mesh_index = material.addGpuMesh(allocator, gpu_mesh);
 

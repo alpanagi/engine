@@ -1,12 +1,10 @@
 const gltf = @import("gltf");
-const obj = @import("parsers/obj.zig");
 const sdl = @import("sdl");
 const sdl_image = @import("sdl_image");
 const std = @import("std");
 const toml = @import("toml");
 const util = @import("../../util.zig");
 
-const MeshData = @import("../../data/mesh_data.zig").MeshData;
 const World = @import("ecs").World;
 
 pub const AssetLoaderError = error{
@@ -87,17 +85,6 @@ pub const AssetLoader = struct {
         return @ptrCast(image);
     }
 
-    pub fn loadObj(
-        self: AssetLoader,
-        allocator: std.mem.Allocator,
-        path: []const u8,
-    ) !MeshData {
-        const bytes = try self.readBinaryFileAlloc(allocator, path);
-        defer allocator.free(bytes);
-
-        return self.parseObj(allocator, bytes);
-    }
-
     pub fn loadToml(
         self: AssetLoader,
         allocator: std.mem.Allocator,
@@ -116,15 +103,6 @@ pub const AssetLoader = struct {
         bytes: []const u8,
     ) !gltf.Gltf {
         return gltf.parseAlloc(allocator, bytes);
-    }
-
-    pub fn parseObj(
-        _: AssetLoader,
-        allocator: std.mem.Allocator,
-        bytes: []const u8,
-    ) !MeshData {
-        var reader = std.Io.Reader.fixed(bytes);
-        return obj.parse(allocator, &reader);
     }
 
     pub fn parseToml(

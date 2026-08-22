@@ -4,8 +4,10 @@ const util = @import("../../util.zig");
 
 const GPUBuffer = @import("gpu_buffer.zig").GPUBuffer;
 const GPUMesh = @import("gpu_mesh.zig").GPUMesh;
+const Vertex = @import("../../data/vertex.zig").Vertex;
 
-const vertex_size: u32 = @sizeOf(f32) * 3;
+const vertex_size: u32 = @sizeOf(Vertex);
+const vertex_attributes = vertexAttributes(Vertex);
 const initial_vertex_capacity: u32 = 1024;
 
 pub const Material = struct {
@@ -40,16 +42,11 @@ pub const Material = struct {
             .pitch = vertex_size,
             .input_rate = sdl.SDL_GPU_VERTEXINPUTRATE_VERTEX,
         };
-        const vertex_attribute = sdl.SDL_GPUVertexAttribute{
-            .location = 0,
-            .buffer_slot = 0,
-            .format = sdl.SDL_GPU_VERTEXELEMENTFORMAT_FLOAT3,
-        };
         const vertex_input_state = sdl.SDL_GPUVertexInputState{
             .vertex_buffer_descriptions = &vertex_buffer_description,
             .num_vertex_buffers = 1,
-            .vertex_attributes = &vertex_attribute,
-            .num_vertex_attributes = 1,
+            .vertex_attributes = &vertex_attributes,
+            .num_vertex_attributes = vertex_attributes.len,
         };
         const rasterizer_state = sdl.SDL_GPURasterizerState{
             .fill_mode = sdl.SDL_GPU_FILLMODE_FILL,
@@ -129,7 +126,7 @@ pub const Material = struct {
         return index;
     }
 
-    pub fn addVertices(self: *Material, device: *sdl.SDL_GPUDevice, vertices: []const [3]f32) u32 {
+    pub fn addVertices(self: *Material, device: *sdl.SDL_GPUDevice, vertices: []const Vertex) u32 {
         const count: u32 = @intCast(vertices.len);
         const offset = if (self.vertex_buffer) |buffer| buffer.count else 0;
         if (count == 0) return offset;
@@ -165,6 +162,32 @@ pub const Material = struct {
         }
     }
 };
+
+fn vertexAttributes(comptime T: type) [std.meta.fields(T).len]sdl.SDL_GPUVertexAttribute {
+    const fields = std.meta.fields(T);
+
+    var attributes: [fields.len]sdl.SDL_GPUVertexAttribute = undefined;
+    for (&attributes, fields, 0..) |*attribute, field, location| {
+        attribute.* = .{
+            .location = @intCast(location),
+            .buffer_slot = 0,
+            .format = vertexElementFormat(field.type),
+            .offset = @offsetOf(T, field.name),
+        };
+    }
+
+    return attributes;
+}
+
+fn vertexElementFormat(comptime T: type) c_uint {
+    return switch (T) {
+        f32 => sdl.SDL_GPU_VERTEXELEMENTFORMAT_FLOAT,
+        [2]f32 => sdl.SDL_GPU_VERTEXELEMENTFORMAT_FLOAT2,
+        [3]f32 => sdl.SDL_GPU_VERTEXELEMENTFORMAT_FLOAT3,
+        [4]f32 => sdl.SDL_GPU_VERTEXELEMENTFORMAT_FLOAT4,
+        else => @compileError("unsupported vertex attribute type " ++ @typeName(T)),
+    };
+}
 
 fn createShader(
     device: *sdl.SDL_GPUDevice,

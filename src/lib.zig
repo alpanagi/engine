@@ -13,7 +13,7 @@ pub const components = struct {
 };
 
 pub const data = struct {
-    pub const MeshData = @import("data/mesh_data.zig").MeshData;
+    pub const Vertex = @import("data/vertex.zig").Vertex;
 };
 
 pub const events = struct {
@@ -31,10 +31,16 @@ pub const events = struct {
 };
 
 pub const gltf = struct {
+    pub const Entry = @import("gltf/mesh_data.zig").Entry;
     pub const Gltf = @import("gltf").Gltf;
     pub const GltfError = @import("gltf").GltfError;
+    pub const Image = @import("gltf").Image;
+    pub const Material = @import("gltf").Material;
     pub const Mesh = @import("gltf").Mesh;
+    pub const MeshDataError = @import("gltf/mesh_data.zig").MeshDataError;
     pub const Primitive = @import("gltf").Primitive;
+
+    pub const meshDataFrom = @import("gltf/mesh_data.zig").meshDataFrom;
 };
 
 pub const math = struct {

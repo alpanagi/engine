@@ -17,8 +17,8 @@
             .hash = "shaders-0.0.0-OlY1ry-QAAB1E4duQVx90HZSh6unv98dWPzavwlwgryN",
         },
         .gltf = .{
-            .url = "git+https://github.com/alpanagi/gltf.git#1b3d123d65828d15e31e4980ce0bfdecd69d0321",
-            .hash = "gltf-0.0.0-qgf4uQQRAQDLezk8mOYbVFr9TAM8keoNlU--BuhFdVGi",
+            .url = "git+https://github.com/alpanagi/gltf.git#3249fe8e6a290d93997f5c8329b7351dc91ed761",
+            .hash = "gltf-0.0.0-qgf4uf0jAQCY6htUbYlcZyxFxd_A3umAeeSCjfuH6qb5",
         },
     },
     .paths = .{
